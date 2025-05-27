@@ -2,7 +2,7 @@
   "name": "crm-trace",
   "version": "1.0.0",
   "main": "index.js",
- "scripts": {
+  "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
@@ -10,16 +10,17 @@
   "author": "",
   "license": "ISC",
   "description": "",
- "dependencies": {
-    "express": "^4.18.2",
-    "pg": "^8.11.3",
+  "dependencies": {
+    "@google-cloud/secret-manager": "^6.0.1",
+    "cors": "^2.8.5",
     "dotenv": "^16.0.3",
-    "cors": "^2.8.5"
+    "express": "^4.18.2",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": "22.x"
+    "node": "20.x"
   }
 }
