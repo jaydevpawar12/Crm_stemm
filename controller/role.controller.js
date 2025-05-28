@@ -1,9 +1,11 @@
-const { initializePool } = require('../db');
+// const { initializePool } = require('../db');
+const { pool } = require('../db');
+
 
 exports.createRole = async (req, res) => {
   const { name, permissions } = req.body;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const existing = await client.query('SELECT 1 FROM roles WHERE name = $1', [name]);
@@ -26,7 +28,7 @@ exports.createRole = async (req, res) => {
 
 exports.getAllRoles = async (req, res) => {
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM roles');
@@ -43,7 +45,7 @@ exports.getAllRoles = async (req, res) => {
 exports.getRoleById = async (req, res) => {
   const { id } = req.params;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM roles WHERE id = $1', [id]);
@@ -62,7 +64,7 @@ exports.updateRole = async (req, res) => {
   const { id } = req.params;
   const { name, permissions } = req.body;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -83,7 +85,7 @@ exports.updateRole = async (req, res) => {
 exports.deleteRole = async (req, res) => {
   const { id } = req.params;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('DELETE FROM roles WHERE id = $1 RETURNING *', [id]);
