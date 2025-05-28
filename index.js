@@ -90,6 +90,8 @@ const prospectRoutes = require('./routes/prospectRoutes');
 
 
 app.use(express.json());
+app.use(require('cors')());
+
 
 app.use('/api/roles', roleRoutes);
 app.use('/api/users', userRoutes);
