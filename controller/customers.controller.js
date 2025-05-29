@@ -1,4 +1,6 @@
-const { initializePool } = require('../db');
+// const { initializePool } = require('../db');
+const { pool } = require('../db');
+
 
 // Create Customer
 exports.createCustomer = async (req, res) => {
@@ -9,7 +11,7 @@ exports.createCustomer = async (req, res) => {
       locationname, customercode, assigntoid, imageurl
     } = req.body;
 
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -36,7 +38,7 @@ exports.createCustomer = async (req, res) => {
 // Get All Customers
 exports.getCustomers = async (req, res) => {
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM customers');
@@ -54,7 +56,7 @@ exports.getCustomers = async (req, res) => {
 exports.getCustomerById = async (req, res) => {
   try {
     const { id } = req.params;
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM customers WHERE id = $1', [id]);
@@ -79,7 +81,7 @@ exports.updateCustomer = async (req, res) => {
       locationname, customercode, assigntoid, imageurl
     } = req.body;
 
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -107,7 +109,7 @@ exports.updateCustomer = async (req, res) => {
 exports.deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('DELETE FROM customers WHERE id = $1 RETURNING *', [id]);

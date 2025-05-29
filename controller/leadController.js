@@ -1,4 +1,6 @@
-const { initializePool } = require('../db');
+// const { initializePool } = require('../db');
+const { pool } = require('../db');
+
 
 // CREATE
 exports.createLead = async (req, res) => {
@@ -17,7 +19,7 @@ exports.createLead = async (req, res) => {
   } = req.body;
 
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -39,7 +41,7 @@ exports.createLead = async (req, res) => {
 // READ ALL
 exports.getAllLeads = async (req, res) => {
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM leads ORDER BY created_at DESC');
@@ -57,7 +59,7 @@ exports.getAllLeads = async (req, res) => {
 exports.getLeadById = async (req, res) => {
   const { id } = req.params;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM leads WHERE id = $1', [id]);
@@ -90,7 +92,7 @@ exports.updateLead = async (req, res) => {
   } = req.body;
 
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -115,7 +117,7 @@ exports.updateLead = async (req, res) => {
 exports.deleteLead = async (req, res) => {
   const { id } = req.params;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('DELETE FROM leads WHERE id = $1 RETURNING *', [id]);
