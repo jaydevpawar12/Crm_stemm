@@ -128,7 +128,7 @@ exports.getAllUsers = async (req, res) => {
 
       // Add filter for reportingmanagerid if provided
       if (reportingmanagerid) {
-        query += ` AND (u1.reportingmanagerid = $${paramIndex} OR u1.crossreportingmanagerid = $${paramIndex})`;
+        query += ` AND u1.reportingmanagerid = $${paramIndex} `;
         queryParams.push(reportingmanagerid);
         paramIndex++;
       }

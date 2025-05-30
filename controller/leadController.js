@@ -41,10 +41,62 @@ exports.createLead = async (req, res) => {
 // READ ALL
 exports.getAllLeads = async (req, res) => {
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM leads ORDER BY created_at DESC');
+      // Extract query parameters
+      const {customer_id,
+            assigned_to,
+            updatedbyid,
+          // department,
+            status,
+            stage
+             } = req.query;
+
+      // Base query
+      let query = 'SELECT * FROM leads';
+      let conditions = [];
+      let values = [];
+      let paramCount = 1;
+
+      if (assigned_to) {
+        conditions.push(`assigned_to = $${paramCount}`);
+        values.push(assigned_to);
+        paramCount++;
+      }
+
+      if (customer_id) {
+        conditions.push(`customer_id = $${paramCount}`);
+        values.push(customer_id);
+        paramCount++;
+      }
+      if (updatedbyid) {
+        conditions.push(`updatedbyid = $${paramCount}`);
+        values.push(updatedbyid);
+        paramCount++;
+      }
+      if (department) {
+        conditions.push(`department = $${paramCount}`);
+        values.push(department);
+        paramCount++;
+      }
+      if (status) {
+        conditions.push(`status = $${paramCount}`);
+        values.push(status);
+        paramCount++;
+      }
+      if (stage) {
+        conditions.push(`stages = $${paramCount}`);
+        values.push(stage);
+        paramCount++;
+      }
+
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+      }
+
+      query += ' ORDER BY created_at DESC';
+
+      const result = await client.query(query, values);
       res.json(result.rows);
     } finally {
       client.release();

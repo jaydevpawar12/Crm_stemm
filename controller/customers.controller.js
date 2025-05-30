@@ -38,10 +38,47 @@ exports.createCustomer = async (req, res) => {
 // Get All Customers
 exports.getCustomers = async (req, res) => {
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM customers');
+      // Extract query parameters
+      const { assigntoid, created_by } = req.query;
+
+      // Base query with LEFT JOINs to fetch names from users table
+      let query = `
+        SELECT 
+          c.*,
+          u1.name AS assigned_to_name,
+          u2.name AS created_by_name
+        FROM customers c
+        LEFT JOIN users u1 ON c.assigntoid = u1.id
+        LEFT JOIN users u2 ON c.created_by = u2.id
+      `;
+      let conditions = [];
+      let values = [];
+      let paramCount = 1;
+
+      // Build conditions dynamically
+      if (assigntoid) {
+        conditions.push(`c.assigntoid = $${paramCount}`);
+        values.push(assigntoid);
+        paramCount++;
+      }
+      if (created_by) {
+        conditions.push(`c.created_by = $${paramCount}`);
+        values.push(created_by);
+        paramCount++;
+      }
+
+      // Add WHERE clause if there are conditions
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+      }
+
+      // Add ORDER BY clause for consistency
+      query += ' ORDER BY c.created_at DESC';
+
+      // Execute query
+      const result = await client.query(query, values);
       res.status(200).json(result.rows);
     } finally {
       client.release();
@@ -56,10 +93,21 @@ exports.getCustomers = async (req, res) => {
 exports.getCustomerById = async (req, res) => {
   try {
     const { id } = req.params;
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM customers WHERE id = $1', [id]);
+      const result = await client.query(
+        `
+        SELECT 
+          c.*,
+          u1.name AS assigned_to_name,
+          u2.name AS created_by_name
+        FROM customers c
+        LEFT JOIN users u1 ON c.assigntoid = u1.id
+        LEFT JOIN users u2 ON c.created_by = u2.id
+        WHERE c.id = $1
+        `,
+        [id]
+      );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json(result.rows[0]);
     } finally {
