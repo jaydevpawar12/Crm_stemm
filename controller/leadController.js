@@ -85,7 +85,7 @@ exports.getAllLeads = async (req, res) => {
         paramCount++;
       }
       if (stage) {
-        conditions.push(`stages = $${paramCount}`);
+        conditions.push(`stage = $${paramCount}`);
         values.push(stage);
         paramCount++;
       }
