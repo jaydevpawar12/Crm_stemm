@@ -190,21 +190,92 @@ exports.getAllReportingManagers = async (req, res) => {
 };
 
 // Get Single User
-exports.getUserById = async (req, res) => {
-  const { id } = req.params;
+  exports.getUserById = async (req, res) => {
+    const { id } = req.params;
+    try {
+      // const pool = await initializePool();
+      const client = await pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        res.json(result.rows[0]);
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      console.error('Get User Error:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  };
+
+exports.getUserByEmailOrPhone = async (req, res) => {
+  let { email, phone } = req.body;
+
+  // Check if at least one parameter is provided
+  if (!email && !phone) {
+    return res.status(400).json({ error: 'At least one of email or phone is required' });
+  }
+
+  // Trim and decode phone to handle URL encoding (e.g., %2B → +)
+  if (phone) {
+    phone = decodeURIComponent(phone.trim());
+  }
+
+  // Debug: Log raw input
+  console.log('Raw phone input:', phone);
+
   try {
     // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
-      if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-      res.json(result.rows[0]);
+      let query = 'SELECT * FROM users WHERE FALSE';
+      const values = [];
+      let paramIndex = 1;
+
+      if (email) {
+        query += ` OR LOWER(email) = LOWER($${paramIndex})`;
+        values.push(email.trim());
+        paramIndex++;
+      }
+
+      if (phone) {
+        // Try exact match first (e.g., +919192939495)
+        query += ` OR phone = $${paramIndex}`;
+        values.push(phone);
+        paramIndex++;
+
+        // If input is digits-only and 10 digits, try +91 prefix and digits-only
+        const digitsOnly = phone.replace(/\D/g, '');
+        if (!phone.startsWith('+') && digitsOnly.length === 10) {
+          query += ` OR phone = $${paramIndex}`; // Try +91 prefix
+          values.push(`+91${digitsOnly}`);
+          paramIndex++;
+          query += ` OR phone = $${paramIndex}`; // Try digits-only
+          values.push(digitsOnly);
+          paramIndex++;
+        }
+      }
+
+      // Debug: Log query and values (remove in production)
+      console.log('Query:', query, 'Values:', values);
+
+      const result = await client.query(query, values);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Return the first matching user
+      res.status(200).json(result.rows[0]);
+    } catch (error) {
+      console.error('Query execution error:', error);
+      throw error;
     } finally {
-      client.release();
+      await client.release();
     }
-  } catch (err) {
-    console.error('Get User Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+  } catch (error) {
+    console.error('Get user by email or phone error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 

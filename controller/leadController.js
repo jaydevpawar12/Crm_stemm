@@ -74,11 +74,11 @@ exports.getAllLeads = async (req, res) => {
         values.push(updatedbyid);
         paramCount++;
       }
-      if (department) {
-        conditions.push(`department = $${paramCount}`);
-        values.push(department);
-        paramCount++;
-      }
+      // if (department) {
+      //   conditions.push(`department = $${paramCount}`);
+      //   values.push(department);
+      //   paramCount++;
+      // }    
       if (status) {
         conditions.push(`status = $${paramCount}`);
         values.push(status);
