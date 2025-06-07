@@ -53,7 +53,17 @@ exports.getAllLeads = async (req, res) => {
              } = req.query;
 
       // Base query
-      let query = 'SELECT * FROM leads';
+      let query = `
+        SELECT 
+          leads.*,
+          u1.name AS assigned_to_name,
+          u2.name AS updatedby_name,
+          c.name AS customer_name
+        FROM leads
+        LEFT JOIN users u1 ON leads.assigned_to = u1.id
+        LEFT JOIN users u2 ON leads.updatedbyid = u2.id
+        LEFT JOIN customers c ON leads.customer_id = c.id
+      `;
       let conditions = [];
       let values = [];
       let paramCount = 1;
