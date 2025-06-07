@@ -44,13 +44,27 @@ exports.getAllLeads = async (req, res) => {
     const client = await pool.connect();
     try {
       // Extract query parameters
-      const {customer_id,
-            assigned_to,
-            updatedbyid,
-          // department,
-            status,
-            stage
-             } = req.query;
+      const {
+        customer_id,
+        assigned_to,
+        updatedbyid,
+        status,
+        stage,
+        page = 1,
+        limit = 10
+      } = req.query;
+
+      // Validate pagination inputs
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+      if (isNaN(pageNum) || pageNum < 1) {
+        return res.status(400).json({ error: 'Invalid page number: Must be a positive integer' });
+      }
+      if (isNaN(limitNum) || limitNum < 1) {
+        return res.status(400).json({ error: 'Invalid limit: Must be a positive integer' });
+      }
+
+      const offset = (pageNum - 1) * limitNum;
 
       // Base query
       let query = `
@@ -63,51 +77,102 @@ exports.getAllLeads = async (req, res) => {
         LEFT JOIN users u1 ON leads.assigned_to = u1.id
         LEFT JOIN users u2 ON leads.updatedbyid = u2.id
         LEFT JOIN customers c ON leads.customer_id = c.id
+        WHERE 1=1
       `;
       let conditions = [];
       let values = [];
-      let paramCount = 1;
+      let paramIndex = 1;
 
       if (assigned_to) {
-        conditions.push(`assigned_to = $${paramCount}`);
+        query += ` AND leads.assigned_to = $${paramIndex}`;
         values.push(assigned_to);
-        paramCount++;
+        paramIndex++;
       }
 
       if (customer_id) {
-        conditions.push(`customer_id = $${paramCount}`);
+        query += ` AND leads.customer_id = $${paramIndex}`;
         values.push(customer_id);
-        paramCount++;
+        paramIndex++;
       }
+
       if (updatedbyid) {
-        conditions.push(`updatedbyid = $${paramCount}`);
+        query += ` AND leads.updatedbyid = $${paramIndex}`;
         values.push(updatedbyid);
-        paramCount++;
+        paramIndex++;
       }
-      // if (department) {
-      //   conditions.push(`department = $${paramCount}`);
-      //   values.push(department);
-      //   paramCount++;
-      // }    
+
       if (status) {
-        conditions.push(`status = $${paramCount}`);
+        query += ` AND leads.status = $${paramIndex}`;
         values.push(status);
-        paramCount++;
+        paramIndex++;
       }
+
       if (stage) {
-        conditions.push(`stage = $${paramCount}`);
+        query += ` AND leads.stage = $${paramIndex}`;
         values.push(stage);
-        paramCount++;
+        paramIndex++;
       }
 
-      if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ');
+      // Add pagination
+      query += ` ORDER BY leads.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      values.push(limitNum, offset);
+
+      // Total count query
+      let countQuery = `
+        SELECT COUNT(*) FROM leads WHERE 1=1
+      `;
+      let countConditions = [];
+      let countValues = [];
+      let countIndex = 1;
+
+      if (assigned_to) {
+        countQuery += ` AND assigned_to = $${countIndex}`;
+        countValues.push(assigned_to);
+        countIndex++;
       }
 
-      query += ' ORDER BY created_at DESC';
+      if (customer_id) {
+        countQuery += ` AND customer_id = $${countIndex}`;
+        countValues.push(customer_id);
+        countIndex++;
+      }
 
-      const result = await client.query(query, values);
-      res.json(result.rows);
+      if (updatedbyid) {
+        countQuery += ` AND updatedbyid = $${countIndex}`;
+        countValues.push(updatedbyid);
+        countIndex++;
+      }
+
+      if (status) {
+        countQuery += ` AND status = $${countIndex}`;
+        countValues.push(status);
+        countIndex++;
+      }
+
+      if (stage) {
+        countQuery += ` AND stage = $${countIndex}`;
+        countValues.push(stage);
+        countIndex++;
+      }
+
+      // Execute both queries
+      const [dataResult, countResult] = await Promise.all([
+        client.query(query, values),
+        client.query(countQuery, countValues)
+      ]);
+
+      const totalCount = parseInt(countResult.rows[0].count, 10);
+      const totalPages = Math.ceil(totalCount / limitNum);
+
+      res.status(200).json({
+        success: true,
+        data: dataResult.rows,
+        page: pageNum,
+        limit: limitNum,
+        totalCount,
+        totalPages,
+        message: "Leads fetched successfully"
+      });
     } finally {
       client.release();
     }
@@ -116,6 +181,7 @@ exports.getAllLeads = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 // READ ONE
 exports.getLeadById = async (req, res) => {
