@@ -6,11 +6,11 @@ const validator = require('validator');
 const xss = require('xss');
 
 exports.createEnquiryCategory = async (req, res) => {
-  const { createdById, companyId, name, categoryType } = req.body;
+  const { createdById, customerId, name, categoryType } = req.body;
 
   // Input validation
-  if (!createdById || !name || !categoryType || categoryType) {
-    return res.status(400).json({ error: 'createdById, name,categoryType and categoryType are required' });
+  if (!createdById || !customerId || !name || !categoryType) {
+    return res.status(400).json({ error: 'createdById, customerId, name, and categoryType are required' });
   }
 
   // Validate data types and formats
@@ -18,7 +18,9 @@ exports.createEnquiryCategory = async (req, res) => {
     return res.status(400).json({ error: 'createdById must be a valid UUID' });
   }
 
- 
+  if (!validator.isUUID(customerId)) {
+    return res.status(400).json({ error: 'customerId must be a valid UUID' });
+  }
 
   if (!validator.isLength(name, { min: 1, max: 255 })) {
     return res.status(400).json({ error: 'name must be between 1 and 255 characters' });
@@ -38,7 +40,7 @@ exports.createEnquiryCategory = async (req, res) => {
     try {
       // Verify createdById exists in users table
       const userCheck = await client.query(
-        'SELECT 1 FROM users WHERE id = $1',
+        'SELECT 1 FROM public.users WHERE id = $1',
         [createdById]
       );
 
@@ -46,21 +48,31 @@ exports.createEnquiryCategory = async (req, res) => {
         return res.status(400).json({ error: 'Invalid createdById: user does not exist' });
       }
 
-      // Check for duplicate category name for the same company
+      // Verify customerId exists in customers table
+      const customerCheck = await client.query(
+        'SELECT 1 FROM public.customers WHERE id = $1',
+        [customerId]
+      );
+
+      if (customerCheck.rowCount === 0) {
+        return res.status(400).json({ error: 'Invalid customerId: customer does not exist' });
+      }
+
+      // Check for duplicate category name for the same customer
       const duplicateCheck = await client.query(
-        'SELECT 1 FROM enquirycategory WHERE companyId = $1 AND name = $2',
-        [companyId || null, sanitizedName]
+        'SELECT 1 FROM public.enquirycategory WHERE customerid = $1 AND name = $2',
+        [customerId, sanitizedName]
       );
 
       if (duplicateCheck.rowCount > 0) {
-        return res.status(400).json({ error: 'Category name already exists for this company' });
+        return res.status(400).json({ error: 'Category name already exists for this customer' });
       }
 
       const result = await client.query(
-        `INSERT INTO enquirycategory (createdById, companyId, name, categoryType)
+        `INSERT INTO public.enquirycategory (createdbyid, customerid, name, categorytype)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [createdById, companyId || null, sanitizedName, categoryType]
+        [createdById, customerId, sanitizedName, categoryType]
       );
 
       res.status(201).json(result.rows[0]);
@@ -75,10 +87,23 @@ exports.createEnquiryCategory = async (req, res) => {
 
 exports.getAllEnquiryCategories = async (req, res) => {
   try {
-    // const pool = await initializePool();
+          // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query(`SELECT * FROM enquiryCategory`);
+      const result = await client.query(`
+        SELECT 
+          ec.id,
+          ec.createdbyid,
+          u.name AS createdbyname,
+          ec.createdon,
+          ec.name,
+          ec.categorytype,
+          ec.customerid,
+          c.name AS customername
+        FROM public.enquirycategory ec
+        LEFT JOIN public.users u ON ec.createdbyid = u.id
+        LEFT JOIN public.customers c ON ec.customerid = c.id
+      `);
       res.json(result.rows);
     } finally {
       client.release();
@@ -92,11 +117,28 @@ exports.getAllEnquiryCategories = async (req, res) => {
 exports.getEnquiryCategoryById = async (req, res) => {
   const { id } = req.params;
   try {
-    // const pool = await initializePool();
+          // const pool = await initializePool();
+
     const client = await pool.connect();
     try {
-      const result = await client.query(`SELECT * FROM enquiryCategory WHERE id = $1`, [id]);
-      if (result.rows.length === 0) return res.status(404).json({ message: 'Not found' });
+      const result = await client.query(`
+        SELECT 
+          ec.id,
+          ec.createdbyid,
+          u.name AS createdbyname,
+          ec.createdon,
+          ec.name,
+          ec.categorytype,
+          ec.customerid,
+          c.name AS customername
+        FROM public.enquirycategory ec
+        LEFT JOIN public.users u ON ec.createdbyid = u.id
+        LEFT JOIN public.customers c ON ec.customerid = c.id
+        WHERE ec.id = $1
+      `, [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Not found' });
+      }
       res.json(result.rows[0]);
     } finally {
       client.release();
@@ -146,3 +188,9 @@ exports.deleteEnquiryCategory = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+
+
+
+
+

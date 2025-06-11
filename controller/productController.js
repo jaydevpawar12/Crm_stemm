@@ -38,12 +38,12 @@ exports.createProduct = async (req, res) => {
   }
 
   // Numeric validation
-  if (isNaN(price) || price <= 0) {
-    return res.status(400).json({ error: 'price must be a positive number' });
-  }
-  if (isNaN(gstPercentage) || gstPercentage < 0 || gstPercentage > 100) {
-    return res.status(400).json({ error: 'gstPercentage must be between 0 and 100' });
-  }
+  // if (isNaN(price) || price <= 0) {
+  //   return res.status(400).json({ error: 'price must be a positive number' });
+  // }
+  // if (isNaN(gstPercentage) || gstPercentage < 0 || gstPercentage > 100) {
+  //   return res.status(400).json({ error: 'gstPercentage must be between 0 and 100' });
+  // }
 
   // HSN code validation (6-8 digits)
   if (hsnCode && !/^\d{6,8}$/.test(hsnCode)) {

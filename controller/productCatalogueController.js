@@ -210,7 +210,7 @@ exports.updateProductCatalogue = async (req, res) => {
   const { id } = req.params;
   const { link, image, catalogueName } = req.body;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -234,7 +234,7 @@ exports.updateProductCatalogue = async (req, res) => {
 exports.deleteProductCatalogue = async (req, res) => {
   const { id } = req.params;
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('DELETE FROM productcatalogues WHERE id = $1 RETURNING *', [id]);
