@@ -307,7 +307,7 @@ exports.updateProduct = async (req, res) => {
   } = req.body;
 
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -335,7 +335,7 @@ exports.updateProduct = async (req, res) => {
 // DELETE
 exports.deleteProduct = async (req, res) => {
   try {
-    const pool = await initializePool();
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('DELETE FROM products WHERE id = $1 RETURNING *', [req.params.id]);

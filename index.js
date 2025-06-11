@@ -102,7 +102,7 @@ app.use('/api/productCategories', productCategoryRoutes);
 app.use('/api/productCatalogues', catalogueRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/interactions', interactionRoutes);
-app.use('/api/enquiry-category', enquiryCategoryRoutes);
+app.use('/api/enquiryCategory', enquiryCategoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/prospects', prospectRoutes);
 
