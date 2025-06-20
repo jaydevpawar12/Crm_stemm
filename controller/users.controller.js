@@ -3,9 +3,12 @@
 
 // Create User
 
+ // Assuming pool is exported from pg.js
+const { validate: isUUID } = require('uuid'); // Add uuid package for validation
+
 exports.createUser = async (req, res) => {
   const {
-    id,name, email, password_hash, role_id, phone, countrycode, dialcode,
+    id, name, email, password_hash, role_id, phone, countrycode, dialcode,
     employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
     designation, reportingmanagerid, crossreportingmanagerid, addharcard,
     pancard, otherdocument, secretkey, isnewuser = true, emailverify = false,
@@ -13,9 +16,31 @@ exports.createUser = async (req, res) => {
     deviceid, devicename, companyid, companyname
   } = req.body;
 
-  if (!id||!name || !email || !password_hash) {
-    return res.status(400).json({ error: 'Name, email, and password_hash are required' });
-  }
+  // Validate required fields
+  if (!id) return res.status(400).json({ error: 'User ID is required' });
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!password_hash) return res.status(400).json({ error: 'Password hash is required' });
+
+  // Validate UUID fields
+  if (!isUUID(id)) return res.status(400).json({ error: 'Invalid user ID: Must be a valid UUID' });
+  if (role_id && !isUUID(role_id)) return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
+  if (reportingmanagerid && !isUUID(reportingmanagerid)) return res.status(400).json({ error: 'Invalid reportingmanagerid: Must be a valid UUID' });
+  if (crossreportingmanagerid && !isUUID(crossreportingmanagerid)) return res.status(400).json({ error: 'Invalid crossreportingmanagerid: Must be a valid UUID' });
+  if (departmentid && !isUUID(departmentid)) return res.status(400).json({ error: 'Invalid departmentid: Must be a valid UUID' });
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+
+  // Validate other fields (add more as needed)
+  if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  if (countrycode && !/^[A-Z]{2}$/.test(countrycode)) return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
+  if (dialcode && !/^\+\d{1,4}$/.test(dialcode)) return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
+  if (pancard && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pancard)) return res.status(400).json({ error: 'Invalid PAN card format' });
+  if (addharcard && !/^\d{4}-\d{4}-\d{4}-\d{4}$/.test(addharcard)) return res.status(400).json({ error: 'Invalid Aadhar card format' });
+  if (role_id && !['User', 'Manager', 'Admin'].includes(role_id)) return res.status(400).json({ error: 'Invalid role_id: Must be User, Manager, or Admin' });
+  if (employeetype && !['office', 'field'].includes(employeetype)) return res.status(400).json({ error: 'Invalid employeetype: Must be office or field' });
 
   try {
     const client = await pool.connect();
@@ -36,6 +61,22 @@ exports.createUser = async (req, res) => {
         }
       }
 
+      // Validate role_id exists in roles table (assuming roles table exists)
+      if (role_id) {
+        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [role_id]);
+        if (roleCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid role_id: Role does not exist' });
+        }
+      }
+
+      // Validate departmentid exists in departments table (assuming departments table exists)
+      if (departmentid) {
+        const deptCheck = await client.query('SELECT 1 FROM departments WHERE id = $1', [departmentid]);
+        if (deptCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
+        }
+      }
+
       const result = await client.query(
         `INSERT INTO users (
           id, name, email, password_hash, role_id, phone, countrycode, dialcode,
@@ -51,7 +92,7 @@ exports.createUser = async (req, res) => {
         )
         RETURNING *`,
         [
-         id, name, email, password_hash, role_id, phone, countrycode, dialcode,
+          id, name, email, password_hash, role_id, phone, countrycode, dialcode,
           employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
           designation, reportingmanagerid, crossreportingmanagerid, addharcard,
           pancard, otherdocument, secretkey, isnewuser, emailverify, isuserdisabled,
@@ -60,21 +101,26 @@ exports.createUser = async (req, res) => {
       );
 
       res.status(201).json(result.rows[0]);
+    } catch (err) {
+      console.error('Create user error:', err.stack);
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+      }
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation (e.g., duplicate email or id)' });
+      }
+      if (err.code === '22P02') {
+        return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
+      }
+      res.status(500).json({ error: 'Failed to create user', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Create user error:', err);
-    if (err.code === '23503') {
-      return res.status(400).json({ error: 'Invalid foreign key value' });
-    }
-    res.status(500).json({ error: 'Failed to create user',details:err.message });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database', details: err.message });
   }
 };
-
-
-
-
 
 // Get All Users
 // exports.getAllUsers = async (req, res) => {
@@ -169,10 +215,6 @@ exports.createUser = async (req, res) => {
 //     res.status(500).json({ error: 'Internal Server Error' });
 //   }
 // };
-
-
-
-
 
 exports.getAllUsers = async (req, res) => {
   try {
