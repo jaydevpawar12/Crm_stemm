@@ -38,16 +38,16 @@ exports.createUser = async (req, res) => {
 
       const result = await client.query(
         `INSERT INTO users (
-           id, name, email, password_hash, role_id, phone, countrycode, dialcode,
-  employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
-  designation, reportingmanagerid, crossreportingmanagerid, addharcard,
-  pancard, otherdocument, secretkey, isnewuser, emailverify, isuserdisabled,
-  webaccess, mobileaccess, deviceid, devicename, companyid, companyname   
+          id, name, email, password_hash, role_id, phone, countrycode, dialcode,
+          employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
+          designation, reportingmanagerid, crossreportingmanagerid, addharcard,
+          pancard, otherdocument, secretkey, isnewuser, emailverify, isuserdisabled,
+          webaccess, mobileaccess, deviceid, devicename, companyid, companyname   
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, 
-  $9, $10, $11, $12, $13, $14, 
-  $15, $16, $17, $18, $19, $20,
-  $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+          $9, $10, $11, $12, $13, $14, 
+          $15, $16, $17, $18, $19, $20,
+          $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
         )
         RETURNING *`,
         [
@@ -68,7 +68,7 @@ exports.createUser = async (req, res) => {
     if (err.code === '23503') {
       return res.status(400).json({ error: 'Invalid foreign key value' });
     }
-    res.status(500).json({ error: 'Failed to create user' });
+    res.status(500).json({ error: 'Failed to create user',details:err.message });
   }
 };
 

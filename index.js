@@ -111,6 +111,6 @@ app.use('/api/prospects', prospectRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log("Connected")
+  console.log("Connected")
   console.log(`Server running on port ${PORT}`);
 });
