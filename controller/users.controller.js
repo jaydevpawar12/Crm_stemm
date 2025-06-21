@@ -36,9 +36,6 @@ exports.createUser = async (req, res) => {
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
   if (countrycode && !/^[A-Z]{2}$/.test(countrycode)) return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
   if (dialcode && !/^\+\d{1,4}$/.test(dialcode)) return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
-  if (pancard && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pancard)) return res.status(400).json({ error: 'Invalid PAN card format' });
-  if (addharcard && !/^\d{4}-\d{4}-\d{4}-\d{4}$/.test(addharcard)) return res.status(400).json({ error: 'Invalid Aadhar card format' });
-  if (role_id && !['User', 'Manager', 'Admin'].includes(role_id)) return res.status(400).json({ error: 'Invalid role_id: Must be User, Manager, or Admin' });
   if (employeetype && !['office', 'field'].includes(employeetype)) return res.status(400).json({ error: 'Invalid employeetype: Must be office or field' });
 
   try {
@@ -87,7 +84,7 @@ exports.createUser = async (req, res) => {
           $1, $2, $3, $4, $5, $6, $7, $8, 
           $9, $10, $11, $12, $13, $14, 
           $15, $16, $17, $18, $19, $20,
-          $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+          $21, $22, $23, $24, $25, $26, $27, $28, $29
         )
         RETURNING *`,
         [

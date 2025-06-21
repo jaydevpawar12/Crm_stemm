@@ -35,6 +35,7 @@ exports.createCustomer = async (req, res) => {
     const client = await pool.connect();
     try {
       // Validate created_by exists in users table
+      console.log('created_by:', created_by);
       const creatorCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [created_by]);
       if (creatorCheck.rows.length === 0) {
         return res.status(400).json({ error: 'Invalid created_by: User does not exist' });

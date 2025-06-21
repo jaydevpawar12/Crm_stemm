@@ -4,19 +4,16 @@ const { validate: isUUID } = require('uuid');
 
 
 exports.createForm = async (req, res) => {
-  const { id, formName, formType, createdById, customerId, isLeadForm = false, companyId } = req.body;
+  const { formName, formType, createdById, isLeadForm = false, companyId } = req.body;
 
   // Validate required fields
   if (!formName) return res.status(400).json({ error: 'Form name is required' });
   if (!formType) return res.status(400).json({ error: 'Form type is required' });
   if (!createdById) return res.status(400).json({ error: 'Created by ID is required' });
-  if (!customerId) return res.status(400).json({ error: 'Customer ID is required' });
   if (!companyId) return res.status(400).json({ error: 'Company ID is required' });
 
   // Validate UUID fields
-  if (id && !isUUID(id)) return res.status(400).json({ error: 'Invalid form ID: Must be a valid UUID' });
   if (!isUUID(createdById)) return res.status(400).json({ error: 'Invalid createdById: Must be a valid UUID' });
-  if (!isUUID(customerId)) return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
 
   // Validate formType
   if (!['survey', 'feedback', 'registration'].includes(formType)) {
@@ -33,17 +30,13 @@ exports.createForm = async (req, res) => {
         return res.status(400).json({ error: 'Invalid createdById: User does not exist' });
       }
 
-      // Validate customerId exists in customers table
-      const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [customerId]);
-      if (customerCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
-      }
+    
 
       const result = await client.query(
-        `INSERT INTO public.forms (id, formName, formType, createdById, customerId, isLeadForm, companyId)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO public.forms ( formName, formType, createdById, isLeadForm, companyId)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [id || null, formName, formType, createdById, customerId, isLeadForm, companyId]
+        [ formName, formType, createdById, isLeadForm, companyId]
       );
       res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -106,17 +99,15 @@ exports.getFormById = async (req, res) => {
 
 exports.updateForm = async (req, res) => {
   const { id } = req.params;
-  const { formName, formType, customerId, isLeadForm, companyId } = req.body;
+  const { formName, formType, isLeadForm, companyId } = req.body;
 
   // Validate required fields
   if (!formName) return res.status(400).json({ error: 'Form name is required' });
   if (!formType) return res.status(400).json({ error: 'Form type is required' });
-  if (!customerId) return res.status(400).json({ error: 'Customer ID is required' });
   if (!companyId) return res.status(400).json({ error: 'Company ID is required' });
 
   // Validate UUID fields
   if (!isUUID(id)) return res.status(400).json({ error: 'Invalid form ID: Must be a valid UUID' });
-  if (!isUUID(customerId)) return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
 
   // Validate formType
   if (!['survey', 'feedback', 'registration'].includes(formType)) {
@@ -126,18 +117,13 @@ exports.updateForm = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      // Validate customerId exists in customers table
-      const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [customerId]);
-      if (customerCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
-      }
 
       const result = await client.query(
         `UPDATE public.forms
-         SET formName = $1, formType = $2, customerId = $3, isLeadForm = $4, companyId = $5
-         WHERE id = $6
+         SET formName = $1, formType = $2, isLeadForm = $3, companyId = $4
+         WHERE id = $5
          RETURNING *`,
-        [formName, formType, customerId, isLeadForm, companyId, id]
+        [formName, formType, isLeadForm, companyId, id]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form not found' });
@@ -179,6 +165,36 @@ exports.deleteForm = async (req, res) => {
     }
   } catch (err) {
     console.error('Delete form error:', err.stack);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+};
+
+exports.searchForms = async (req, res) => {
+  const { name } = req.query;
+
+  // Validate name query parameter
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return res.status(400).json({ error: 'Name query parameter is required and must be a non-empty string' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      // Use ILIKE for case-insensitive partial matching
+      const result = await client.query(
+        'SELECT * FROM public.forms WHERE formName ILIKE $1 ORDER BY createdAt DESC',
+        [`%${name.trim()}%`]
+      );
+      res.json({
+        success: true,
+        data: result.rows,
+        message: result.rows.length > 0 ? 'Forms found' : 'No forms found matching the search criteria'
+      });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Search forms error:', err.stack);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };

@@ -3,22 +3,19 @@ const { validate: isUUID } = require('uuid');
 
 exports.createFormField = async (req, res) => {
   const {
-    id, formId, customerId, label, type, required, minCharacters, maxCharacters, validator,
+     formId, label, type, required, minCharacters, maxCharacters, validator,
     value, startDate, endDate, options, fieldOrder, companyId
   } = req.body;
 
   // Validate required fields
   if (!formId) return res.status(400).json({ error: 'Form ID is required' });
-  if (!customerId) return res.status(400).json({ error: 'Customer ID is required' });
   if (!label) return res.status(400).json({ error: 'Label is required' });
   if (!type) return res.status(400).json({ error: 'Type is required' });
   if (required === undefined) return res.status(400).json({ error: 'Required field is required' });
   if (!fieldOrder && fieldOrder !== 0) return res.status(400).json({ error: 'Field order is required' });
 
   // Validate UUID fields
-  if (id && !isUUID(id)) return res.status(400).json({ error: 'Invalid form field ID: Must be a valid UUID' });
   if (!isUUID(formId)) return res.status(400).json({ error: 'Invalid formId: Must be a valid UUID' });
-  if (!isUUID(customerId)) return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
 
   // Validate type
   if (!['text', 'number', 'date', 'select', 'checkbox', 'radio'].includes(type)) {
@@ -66,20 +63,16 @@ exports.createFormField = async (req, res) => {
         return res.status(400).json({ error: 'Invalid formId: Form does not exist' });
       }
 
-      // Validate customerId exists in customers table
-      const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [customerId]);
-      if (customerCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
-      }
+      
 
       const result = await client.query(
         `INSERT INTO public.formfields (
-          id, formId, customerId, label, type, required, minCharacters, maxCharacters, validator,
+           formId, label, type, required, minCharacters, maxCharacters, validator,
           value, startDate, endDate, options, fieldOrder, companyId
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *`,
         [
-          id || null, formId, customerId, label, type, required, minCharacters, maxCharacters, validator,
+          formId, label, type, required, minCharacters, maxCharacters, validator,
           value, startDate, endDate, options ? JSON.stringify(options) : null, fieldOrder, companyId
         ]
       );
@@ -145,13 +138,12 @@ exports.getFormFieldById = async (req, res) => {
 exports.updateFormField = async (req, res) => {
   const { id } = req.params;
   const {
-    formId, customerId, label, type, required, minCharacters, maxCharacters, validator,
+    formId, label, type, required, minCharacters, maxCharacters, validator,
     value, startDate, endDate, options, fieldOrder, companyId
   } = req.body;
 
   // Validate required fields
   if (!formId) return res.status(400).json({ error: 'Form ID is required' });
-  if (!customerId) return res.status(400).json({ error: 'Customer ID is required' });
   if (!label) return res.status(400).json({ error: 'Label is required' });
   if (!type) return res.status(400).json({ error: 'Type is required' });
   if (required === undefined) return res.status(400).json({ error: 'Required field is required' });
@@ -160,7 +152,6 @@ exports.updateFormField = async (req, res) => {
   // Validate UUID fields
   if (!isUUID(id)) return res.status(400).json({ error: 'Invalid form field ID: Must be a valid UUID' });
   if (!isUUID(formId)) return res.status(400).json({ error: 'Invalid formId: Must be a valid UUID' });
-  if (!isUUID(customerId)) return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
 
   // Validate type
   if (!['text', 'number', 'date', 'select', 'checkbox', 'radio'].includes(type)) {
@@ -207,21 +198,17 @@ exports.updateFormField = async (req, res) => {
         return res.status(400).json({ error: 'Invalid formId: Form does not exist' });
       }
 
-      // Validate customerId exists in customers table
-      const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [customerId]);
-      if (customerCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
-      }
+     
 
       const result = await client.query(
         `UPDATE public.formfields
-         SET formId = $1, customerId = $2, label = $3, type = $4, required = $5,
-             minCharacters = $6, maxCharacters = $7, validator = $8, value = $9,
-             startDate = $10, endDate = $11, options = $12, fieldOrder = $13, companyId = $14
-         WHERE id = $15
+         SET formId = $1,  label = $2, type = $3, required = $4,
+             minCharacters = $5, maxCharacters = $6, validator = $7, value = $8,
+             startDate = $9, endDate = $10, options = $11, fieldOrder = $12, companyId = $13
+         WHERE id = $14
          RETURNING *`,
         [
-          formId, customerId, label, type, required, minCharacters, maxCharacters, validator,
+          formId, label, type, required, minCharacters, maxCharacters, validator,
           value, startDate, endDate, options ? JSON.stringify(options) : null, fieldOrder, companyId, id
         ]
       );

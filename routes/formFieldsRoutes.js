@@ -6,7 +6,7 @@ const {
   getFormFieldById,
   updateFormField,
   deleteFormField,
-} = require('../controllers/formFieldsController');
+} = require('../controller/formFieldsController');
 
 router.post('/', createFormField);
 router.get('/', getAllFormFields);

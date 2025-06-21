@@ -86,6 +86,7 @@ const enquiryCategoryRoutes = require('./routes/enquiryCategoryRoutes');
 const productRoutes = require('./routes/productRoutes');
 const prospectRoutes = require('./routes/prospectRoutes');
 const formRoutes = require('./routes/formsRoutes');
+const formFieldRoutes = require('./routes/formFieldsRoutes');
 
 
 
@@ -106,7 +107,8 @@ app.use('/api/interactions', interactionRoutes);
 app.use('/api/enquiryCategory', enquiryCategoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/prospects', prospectRoutes);
-app.use('/api/froms', formRoutes);
+app.use('/api/forms', formRoutes);
+app.use('/api/formfields', formFieldRoutes);
 
 
 
