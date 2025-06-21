@@ -6,7 +6,7 @@ const {
   getFormById,
   updateForm,
   deleteForm,
-} = require('../controllers/formsController');
+} = require('../controller/formsController');
 
 router.post('/', createForm);
 router.get('/', getAllForms);

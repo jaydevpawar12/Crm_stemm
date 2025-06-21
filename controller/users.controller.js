@@ -8,7 +8,7 @@ const { validate: isUUID } = require('uuid'); // Add uuid package for validation
 
 exports.createUser = async (req, res) => {
   const {
-    id, name, email, password_hash, role_id, phone, countrycode, dialcode,
+    id, name, email, role_id, phone, countrycode, dialcode,
     employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
     designation, reportingmanagerid, crossreportingmanagerid, addharcard,
     pancard, otherdocument, secretkey, isnewuser = true, emailverify = false,
@@ -20,7 +20,6 @@ exports.createUser = async (req, res) => {
   if (!id) return res.status(400).json({ error: 'User ID is required' });
   if (!name) return res.status(400).json({ error: 'Name is required' });
   if (!email) return res.status(400).json({ error: 'Email is required' });
-  if (!password_hash) return res.status(400).json({ error: 'Password hash is required' });
 
   // Validate UUID fields
   if (!isUUID(id)) return res.status(400).json({ error: 'Invalid user ID: Must be a valid UUID' });
@@ -79,7 +78,7 @@ exports.createUser = async (req, res) => {
 
       const result = await client.query(
         `INSERT INTO users (
-          id, name, email, password_hash, role_id, phone, countrycode, dialcode,
+          id, name, email, role_id, phone, countrycode, dialcode,
           employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
           designation, reportingmanagerid, crossreportingmanagerid, addharcard,
           pancard, otherdocument, secretkey, isnewuser, emailverify, isuserdisabled,
@@ -92,7 +91,7 @@ exports.createUser = async (req, res) => {
         )
         RETURNING *`,
         [
-          id, name, email, password_hash, role_id, phone, countrycode, dialcode,
+          id, name, email, role_id, phone, countrycode, dialcode,
           employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
           designation, reportingmanagerid, crossreportingmanagerid, addharcard,
           pancard, otherdocument, secretkey, isnewuser, emailverify, isuserdisabled,

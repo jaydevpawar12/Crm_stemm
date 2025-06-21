@@ -1,51 +1,92 @@
-// const { initializePool } = require('../db');
-  const { pool } = require('../db');
-
+const { pool } = require('../db');
+const { validate: isUUID } = require('uuid');
 
 exports.createFormResponse = async (req, res) => {
-  const { formid, formfieldid, userid, responsevalue } = req.body;
+  const { id, formId, formFieldId, userId, responseValue } = req.body;
+
+  // Validate required fields
+  if (!formId) return res.status(400).json({ error: 'Form ID is required' });
+  if (!formFieldId) return res.status(400).json({ error: 'Form field ID is required' });
+  if (!userId) return res.status(400).json({ error: 'User ID is required' });
+  if (!responseValue) return res.status(400).json({ error: 'Response value is required' });
+
+  // Validate UUID fields
+  if (id && !isUUID(id)) return res.status(400).json({ error: 'Invalid form response ID: Must be a valid UUID' });
+  if (!isUUID(formId)) return res.status(400).json({ error: 'Invalid formId: Must be a valid UUID' });
+  if (!isUUID(formFieldId)) return res.status(400).json({ error: 'Invalid formFieldId: Must be a valid UUID' });
+  if (!isUUID(userId)) return res.status(400).json({ error: 'Invalid userId: Must be a valid UUID' });
 
   try {
     // const pool = await initializePool();
     const client = await pool.connect();
     try {
+      // Validate formId exists in forms table
+      const formCheck = await client.query('SELECT 1 FROM forms WHERE id = $1', [formId]);
+      if (formCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid formId: Form does not exist' });
+      }
+
+      // Validate formFieldId exists in formfields table and belongs to formId
+      const fieldCheck = await client.query('SELECT 1 FROM formfields WHERE id = $1 AND formId = $2', [formFieldId, formId]);
+      if (fieldCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid formFieldId: Form field does not exist or does not belong to the specified form' });
+      }
+
+      // Validate userId exists in users table
+      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [userId]);
+      if (userCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid userId: User does not exist' });
+      }
+
       const result = await client.query(
-        `INSERT INTO public.formresponses (formid, formfieldid, userid, responsevalue)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO public.formresponses (id, formId, formFieldId, userId, responseValue)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [formid, formfieldid, userid, responsevalue]
+        [id || null, formId, formFieldId, userId, responseValue]
       );
       res.status(201).json(result.rows[0]);
+    } catch (err) {
+      console.error('Create form response error:', err.stack);
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+      }
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation (e.g., duplicate id)' });
+      }
+      if (err.code === '22P02') {
+        return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
+      }
+      res.status(500).json({ error: 'Failed to create form response', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Create form response error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database', details: err.message });
   }
 };
 
 exports.getAllFormResponses = async (req, res) => {
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM public.formresponses ORDER BY submittedat DESC');
+      const result = await client.query('SELECT * FROM public.formresponses ORDER BY submittedAt DESC');
       res.json(result.rows);
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Get form responses error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Get form responses error:', err.stack);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };
 
 exports.getFormResponseById = async (req, res) => {
   const { id } = req.params;
 
+  if (!isUUID(id)) return res.status(400).json({ error: 'Invalid form response ID: Must be a valid UUID' });
+
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM public.formresponses WHERE id = $1', [id]);
@@ -57,44 +98,83 @@ exports.getFormResponseById = async (req, res) => {
       client.release();
     }
   } catch (err) {
-    console.error('Get form response error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Get form response error:', err.stack);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };
 
 exports.updateFormResponse = async (req, res) => {
   const { id } = req.params;
-  const { formid, formfieldid, userid, responsevalue } = req.body;
+  const { formId, formFieldId, userId, responseValue } = req.body;
+
+  // Validate required fields
+  if (!formId) return res.status(400).json({ error: 'Form ID is required' });
+  if (!formFieldId) return res.status(400).json({ error: 'Form field ID is required' });
+  if (!userId) return res.status(400).json({ error: 'User ID is required' });
+  if (!responseValue) return res.status(400).json({ error: 'Response value is required' });
+
+  // Validate UUID fields
+  if (!isUUID(id)) return res.status(400).json({ error: 'Invalid form response ID: Must be a valid UUID' });
+  if (!isUUID(formId)) return res.status(400).json({ error: 'Invalid formId: Must be a valid UUID' });
+  if (!isUUID(formFieldId)) return res.status(400).json({ error: 'Invalid formFieldId: Must be a valid UUID' });
+  if (!isUUID(userId)) return res.status(400).json({ error: 'Invalid userId: Must be a valid UUID' });
 
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
+      // Validate formId exists in forms table
+      const formCheck = await client.query('SELECT 1 FROM forms WHERE id = $1', [formId]);
+      if (formCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid formId: Form does not exist' });
+      }
+
+      // Validate formFieldId exists in formfields table and belongs to formId
+      const fieldCheck = await client.query('SELECT 1 FROM formfields WHERE id = $1 AND formId = $2', [formFieldId, formId]);
+      if (fieldCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid formFieldId: Form field does not exist or does not belong to the specified form' });
+      }
+
+      // Validate userId exists in users table
+      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [userId]);
+      if (userCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid userId: User does not exist' });
+      }
+
       const result = await client.query(
         `UPDATE public.formresponses
-         SET formid = $1, formfieldid = $2, userid = $3, responsevalue = $4
+         SET formId = $1, formFieldId = $2, userId = $3, responseValue = $4
          WHERE id = $5
          RETURNING *`,
-        [formid, formfieldid, userid, responsevalue, id]
+        [formId, formFieldId, userId, responseValue, id]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form response not found' });
       }
       res.json(result.rows[0]);
+    } catch (err) {
+      console.error('Update form response error:', err.stack);
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+      }
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
+      }
+      res.status(500).json({ error: 'Failed to update form response', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Update form response error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database', details: err.message });
   }
 };
 
 exports.deleteFormResponse = async (req, res) => {
   const { id } = req.params;
 
+  if (!isUUID(id)) return res.status(400).json({ error: 'Invalid form response ID: Must be a valid UUID' });
+
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query('DELETE FROM public.formresponses WHERE id = $1 RETURNING *', [id]);
@@ -106,7 +186,7 @@ exports.deleteFormResponse = async (req, res) => {
       client.release();
     }
   } catch (err) {
-    console.error('Delete form response error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Delete form response error:', err.stack);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };
