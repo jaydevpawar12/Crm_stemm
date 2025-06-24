@@ -2,7 +2,7 @@ const { pool } = require('../db');
 const { validate: isUUID } = require('uuid');
 
 exports.createFormResponse = async (req, res) => {
-  const { id, formId, formFieldId, userId, responseValue } = req.body;
+  const {  formId, formFieldId, userId, responseValue } = req.body;
 
   // Validate required fields
   if (!formId) return res.status(400).json({ error: 'Form ID is required' });
@@ -11,7 +11,6 @@ exports.createFormResponse = async (req, res) => {
   if (!responseValue) return res.status(400).json({ error: 'Response value is required' });
 
   // Validate UUID fields
-  if (id && !isUUID(id)) return res.status(400).json({ error: 'Invalid form response ID: Must be a valid UUID' });
   if (!isUUID(formId)) return res.status(400).json({ error: 'Invalid formId: Must be a valid UUID' });
   if (!isUUID(formFieldId)) return res.status(400).json({ error: 'Invalid formFieldId: Must be a valid UUID' });
   if (!isUUID(userId)) return res.status(400).json({ error: 'Invalid userId: Must be a valid UUID' });
@@ -39,12 +38,20 @@ exports.createFormResponse = async (req, res) => {
       }
 
       const result = await client.query(
-        `INSERT INTO public.formresponses (id, formId, formFieldId, userId, responseValue)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO public.formresponses ( formId, formFieldId, userId, responseValue)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [id || null, formId, formFieldId, userId, responseValue]
+        [ formId, formFieldId, userId, responseValue]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+      const formResponses=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formResponses
+      },
+      message:" formResponses Create Successfully"
+      })
     } catch (err) {
       console.error('Create form response error:', err.stack);
       if (err.code === '23503') {
@@ -70,8 +77,23 @@ exports.getAllFormResponses = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM public.formresponses ORDER BY submittedAt DESC');
-      res.json(result.rows);
+      const result = await client.query(`
+        SELECT fr.*, u.name AS user_name, f.formName AS form_name, ff.label AS field_label
+        FROM public.formresponses fr
+        LEFT JOIN public.users u ON fr.userid = u.id
+        LEFT JOIN public.forms f ON fr.formid = f.id
+        LEFT JOIN public.formfields ff ON fr.formfieldid = ff.id
+        ORDER BY fr.submittedAt DESC
+      `);
+      // res.json(result.rows);
+      const formResponses=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formResponses
+      },
+      message:" formResponses Fetch Successfully"
+      })
     } finally {
       client.release();
     }
@@ -89,11 +111,26 @@ exports.getFormResponseById = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM public.formresponses WHERE id = $1', [id]);
+      const result = await client.query(`
+        SELECT fr.*, u.name AS user_name, f.formName AS form_name, ff.label AS field_label
+        FROM public.formresponses fr
+        LEFT JOIN public.users u ON fr.userid = u.id
+        LEFT JOIN public.forms f ON fr.formid = f.id
+        LEFT JOIN public.formfields ff ON fr.formfieldid = ff.id
+        WHERE fr.id = $1
+      `, [id]);
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form response not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      const formResponses=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formResponses
+      },
+      message:" formResponses fetch single  Successfully"
+      })
     } finally {
       client.release();
     }
@@ -150,7 +187,15 @@ exports.updateFormResponse = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form response not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      const formResponses=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formResponses
+      },
+      message:" formResponses update Successfully"
+      })
     } catch (err) {
       console.error('Update form response error:', err.stack);
       if (err.code === '23503') {

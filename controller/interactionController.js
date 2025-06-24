@@ -23,7 +23,12 @@ exports.createInteraction = async (req, res) => {
          RETURNING *`,
         [lead_id, interaction_type, notes, interaction_date || new Date(), created_by, JSON.stringify(attachments)]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'interactions Create successfully'
+      });
     } finally {
       client.release();
     }
@@ -39,7 +44,12 @@ exports.getAllInteractions = async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM interactions ORDER BY interaction_date DESC');
-      res.json(result.rows);
+      // res.json(result.rows);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'interactions Fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -60,7 +70,12 @@ exports.getInteractionById = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Interaction not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'interactions Fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -99,7 +114,12 @@ exports.updateInteraction = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Interaction not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'interactions Update successfully'
+      });
     } finally {
       client.release();
     }

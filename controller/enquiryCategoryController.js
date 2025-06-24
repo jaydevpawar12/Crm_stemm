@@ -80,7 +80,7 @@ exports.createEnquiryCategory = async (req, res) => {
         data:{
           enquiryCategory
         },
-        message:"Enquiry Category Fetch Successfully"
+        message:"Enquiry Category Create Successfully"
       });
     } finally {
       client.release();
@@ -110,7 +110,15 @@ exports.getAllEnquiryCategories = async (req, res) => {
         LEFT JOIN public.users u ON ec.createdbyid = u.id
         LEFT JOIN public.customers c ON ec.customerid = c.id
       `);
-      res.json(result.rows);
+      // res.json(result.rows);
+      const enquiryCategory=result.rows
+      res.status(201).json({
+        success:true,
+        data:{
+          enquiryCategory
+        },
+        message:"Enquiry Category Fetch Successfully"
+      });
     } finally {
       client.release();
     }
@@ -145,7 +153,15 @@ exports.getEnquiryCategoryById = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ message: 'Not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      const enquiryCategory=result.rows
+      res.status(201).json({
+        success:true,
+        data:{
+          enquiryCategory
+        },
+        message:"Enquiry Category Fetch Successfully"
+      });
     } finally {
       client.release();
     }
@@ -167,7 +183,15 @@ exports.updateEnquiryCategory = async (req, res) => {
         [name, categoryType, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: 'Not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      const enquiryCategory=result.rows
+      res.status(201).json({
+        success:true,
+        data:{
+          enquiryCategory
+        },
+        message:"Enquiry Category Update Successfully"
+      });
     } finally {
       client.release();
     }

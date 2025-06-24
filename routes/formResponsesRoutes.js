@@ -6,7 +6,7 @@ const {
   getFormResponseById,
   updateFormResponse,
   deleteFormResponse,
-} = require('../controllers/formResponsesController');
+} = require('../controller/formResponsesController');
 
 router.post('/', createFormResponse);
 router.get('/', getAllFormResponses);

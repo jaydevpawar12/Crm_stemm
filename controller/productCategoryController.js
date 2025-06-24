@@ -55,7 +55,12 @@ exports.createCategory = async (req, res) => {
         [sanitizedCategoryName, createdById]
       );
 
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product category create successfully'
+      });
     } finally {
       client.release();
     }
@@ -114,7 +119,7 @@ exports.getAllCategories = async (req, res) => {
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
-        success: true,
+        status: true,
         data: {
           categories,
           totalCount,
@@ -166,7 +171,12 @@ exports.getCategoryById = async (req, res) => {
         return res.status(404).json({ error: 'Category Not Found' });
       }
 
-      res.status(200).json(result.rows[0]);
+      // res.status(200).json(result.rows[0]);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product category Fetch successfully'
+      });
     } finally {
       client.release();
     }

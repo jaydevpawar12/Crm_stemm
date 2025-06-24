@@ -76,7 +76,15 @@ exports.createFormField = async (req, res) => {
           value, startDate, endDate, options ? JSON.stringify(options) : null, fieldOrder, companyId
         ]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+      const formFileld=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formFileld
+      },
+      message:" formFileld Create Successfully"
+      })
     } catch (err) {
       console.error('Create form field error:', err.stack);
       if (err.code === '23503') {
@@ -102,8 +110,21 @@ exports.getAllFormFields = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM public.formfields ORDER BY fieldOrder ASC');
-      res.json(result.rows);
+      const result = await client.query(`
+        SELECT ff.*, f.formName
+        FROM public.formfields ff
+        LEFT JOIN public.forms f ON ff.formId = f.id
+        ORDER BY ff.fieldOrder ASC
+      `);
+      // res.json(result.rows);
+      const formFilelds=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formFilelds
+      },
+      message:" formFileld Fetch Successfully"
+      })
     } finally {
       client.release();
     }
@@ -121,11 +142,24 @@ exports.getFormFieldById = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM public.formfields WHERE id = $1', [id]);
+      const result = await client.query(`
+        SELECT ff.*, f.formName
+        FROM public.formfields ff
+        LEFT JOIN public.forms f ON ff.formId = f.id
+        WHERE ff.id = $1
+      `, [id]);
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form field not found' });
       }
       res.json(result.rows[0]);
+      const formFileld=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formFileld
+      },
+      message:" formFileld Create Successfully"
+      })
     } finally {
       client.release();
     }
@@ -215,7 +249,15 @@ exports.updateFormField = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form field not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+       const formFileld=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        formFileld
+      },
+      message:" formFileld update Successfully"
+      })
     } catch (err) {
       console.error('Update form field error:', err.stack);
       if (err.code === '23503') {

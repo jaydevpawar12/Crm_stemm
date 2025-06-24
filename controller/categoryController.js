@@ -14,7 +14,12 @@ exports.createCategory = async (req, res) => {
         'INSERT INTO category (id, name) VALUES (gen_random_uuid(), $1) RETURNING *',
         [name]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+      res.status(201).json({
+        success: true,
+        data: { category: result.rows[0] },
+        message: 'category created successfully'
+      });
     } finally {
       client.release();
     }
@@ -30,7 +35,12 @@ exports.getAllCategories = async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM category');
-      res.json(result.rows);
+      // res.json(result.rows);
+      res.status(201).json({
+        success: true,
+        data: { category: result.rows[0] },
+        message: 'category fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -48,7 +58,12 @@ exports.getCategoryById = async (req, res) => {
     try {
       const result = await client.query('SELECT * FROM category WHERE id = $1', [id]);
       if (!result.rows.length) return res.status(404).json({ message: 'Category not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+        success: true,
+        data: { category: result.rows[0] },
+        message: 'category fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -70,7 +85,12 @@ exports.updateCategory = async (req, res) => {
         [name, id]
       );
       if (!result.rows.length) return res.status(404).json({ message: 'Category not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+        success: true,
+        data: { category: result.rows[0] },
+        message: 'category update successfully'
+      });
     } finally {
       client.release();
     }

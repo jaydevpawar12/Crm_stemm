@@ -15,7 +15,12 @@ exports.createEmailTemplate = async (req, res) => {
          RETURNING *`,
         [name, createdById, subject, content, customerId, type]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'EmailTemplate created successfully'
+      });
     } finally {
       client.release();
     }
@@ -31,7 +36,12 @@ exports.getAllEmailTemplates = async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM public.EmailTemplates ORDER BY createdOn DESC');
-      res.json(result.rows);
+      // res.json(result.rows);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'EmailTemplate Fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -52,7 +62,12 @@ exports.getEmailTemplateById = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Email template not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'EmailTemplate Fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -80,7 +95,12 @@ exports.updateEmailTemplate = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Email template not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'EmailTemplate update successfully'
+      });
     } finally {
       client.release();
     }

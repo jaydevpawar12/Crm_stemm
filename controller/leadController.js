@@ -1,58 +1,134 @@
-// const { initializePool } = require('../db');
 const { pool } = require('../db');
+const { validate: isUUID } = require('uuid');
 
-
-// CREATE
 exports.createLead = async (req, res) => {
   const {
-    customer_id,
+    customerId,
     source,
     status,
-    assigned_to,
+    assignedTo,
     notes,
     leadName,
     updatedById,
     stage,
     subCategory,
-    isClose,
-    isCompleted
+    isClose = false,
+    isCompleted = false,
+    phone,
+    isDeal = false,
+    companyId
   } = req.body;
 
+  // Validate UUID fields
+  if (customerId && !isUUID(customerId)) {
+    return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
+  }
+  if (assignedTo && !isUUID(assignedTo)) {
+    return res.status(400).json({ error: 'Invalid assignedTo: Must be a valid UUID' });
+  }
+  if (updatedById && !isUUID(updatedById)) {
+    return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
+  }
+
+  // Validate phone format if provided
+  if (phone && !/^\d{10}$/.test(phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  }
+
+  // Validate companyId if provided
+  if (companyId && !companyId.trim()) {
+    return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
+      // Validate foreign keys
+      if (customerId) {
+        const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [customerId]);
+        if (customerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
+        }
+      }
+      if (assignedTo) {
+        const assignedCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assignedTo]);
+        if (assignedCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid assignedTo: User does not exist' });
+        }
+      }
+      if (updatedById) {
+        const updatedByCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [updatedById]);
+        if (updatedByCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid updatedById: User does not exist' });
+        }
+      }
+
       const result = await client.query(
-        `INSERT INTO leads
-          (customer_id, source, status, assigned_to, notes, leadName, updatedById, stage, subCategory, isClose, isCompleted)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-        [customer_id, source, status, assigned_to, notes, leadName, updatedById, stage, subCategory, isClose, isCompleted]
+        `INSERT INTO leads (
+          customerId, source, status, assignedTo, notes, leadName, updatedById,
+          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING *`,
+        [
+          customerId, source, status, assignedTo, notes, leadName, updatedById,
+          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId
+        ]
       );
-      res.status(201).json(result.rows[0]);
+
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Lead created successfully'
+      });
+    } catch (err) {
+      console.error('Create lead error:', err.stack);
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail });
+      }
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail });
+      }
+      res.status(500).json({ error: 'Failed to create lead', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Create lead error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
 
-// READ ALL
 exports.getAllLeads = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
       // Extract query parameters
       const {
-        customer_id,
-        assigned_to,
-        updatedbyid,
+        customerId,
+        assignedTo,
+        updatedById,
         status,
         stage,
+        companyId,
         page = 1,
         limit = 10
       } = req.query;
+
+      // Validate UUID fields
+      if (customerId && !isUUID(customerId)) {
+        return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
+      }
+      if (assignedTo && !isUUID(assignedTo)) {
+        return res.status(400).json({ error: 'Invalid assignedTo: Must be a valid UUID' });
+      }
+      if (updatedById && !isUUID(updatedById)) {
+        return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
+      }
+
+      // Validate companyId
+      if (companyId && !companyId.trim()) {
+        return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+      }
 
       // Validate pagination inputs
       const pageNum = parseInt(page, 10);
@@ -70,88 +146,86 @@ exports.getAllLeads = async (req, res) => {
       let query = `
         SELECT 
           leads.*,
-          u1.name AS assigned_to_name,
-          u2.name AS updatedby_name,
+          u1.name AS assignedTo_name,
+          u2.name AS updatedBy_name,
           c.name AS customer_name
         FROM leads
-        LEFT JOIN users u1 ON leads.assigned_to = u1.id
-        LEFT JOIN users u2 ON leads.updatedbyid = u2.id
-        LEFT JOIN customers c ON leads.customer_id = c.id
+        LEFT JOIN users u1 ON leads.assignedTo = u1.id
+        LEFT JOIN users u2 ON leads.updatedById = u2.id
+        LEFT JOIN customers c ON leads.customerId = c.id
         WHERE 1=1
       `;
-      let conditions = [];
-      let values = [];
+      const values = [];
       let paramIndex = 1;
 
-      if (assigned_to) {
-        query += ` AND leads.assigned_to = $${paramIndex}`;
-        values.push(assigned_to);
+      if (customerId) {
+        query += ` AND leads.customerId = $${paramIndex}::uuid`;
+        values.push(customerId);
         paramIndex++;
       }
-
-      if (customer_id) {
-        query += ` AND leads.customer_id = $${paramIndex}`;
-        values.push(customer_id);
+      if (assignedTo) {
+        query += ` AND leads.assignedTo = $${paramIndex}::uuid`;
+        values.push(assignedTo);
         paramIndex++;
       }
-
-      if (updatedbyid) {
-        query += ` AND leads.updatedbyid = $${paramIndex}`;
-        values.push(updatedbyid);
+      if (updatedById) {
+        query += ` AND leads.updatedById = $${paramIndex}::uuid`;
+        values.push(updatedById);
         paramIndex++;
       }
-
       if (status) {
         query += ` AND leads.status = $${paramIndex}`;
         values.push(status);
         paramIndex++;
       }
-
       if (stage) {
         query += ` AND leads.stage = $${paramIndex}`;
         values.push(stage);
         paramIndex++;
       }
+      if (companyId) {
+        query += ` AND leads.companyId = $${paramIndex}`;
+        values.push(companyId);
+        paramIndex++;
+      }
 
       // Add pagination
-      query += ` ORDER BY leads.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      query += ` ORDER BY leads.createdAt DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       values.push(limitNum, offset);
 
       // Total count query
-      let countQuery = `
-        SELECT COUNT(*) FROM leads WHERE 1=1
-      `;
-      let countConditions = [];
-      let countValues = [];
+      let countQuery = `SELECT COUNT(*) FROM leads WHERE 1=1`;
+      const countValues = [];
       let countIndex = 1;
 
-      if (assigned_to) {
-        countQuery += ` AND assigned_to = $${countIndex}`;
-        countValues.push(assigned_to);
+      if (customerId) {
+        countQuery += ` AND customerId = $${countIndex}::uuid`;
+        countValues.push(customerId);
         countIndex++;
       }
-
-      if (customer_id) {
-        countQuery += ` AND customer_id = $${countIndex}`;
-        countValues.push(customer_id);
+      if (assignedTo) {
+        countQuery += ` AND assignedTo = $${countIndex}::uuid`;
+        countValues.push(assignedTo);
         countIndex++;
       }
-
-      if (updatedbyid) {
-        countQuery += ` AND updatedbyid = $${countIndex}`;
-        countValues.push(updatedbyid);
+      if (updatedById) {
+        countQuery += ` AND updatedById = $${countIndex}::uuid`;
+        countValues.push(updatedById);
         countIndex++;
       }
-
       if (status) {
         countQuery += ` AND status = $${countIndex}`;
         countValues.push(status);
         countIndex++;
       }
-
       if (stage) {
         countQuery += ` AND stage = $${countIndex}`;
         countValues.push(stage);
+        countIndex++;
+      }
+      if (companyId) {
+        countQuery += ` AND companyId = $${countIndex}`;
+        countValues.push(companyId);
         countIndex++;
       }
 
@@ -165,7 +239,7 @@ exports.getAllLeads = async (req, res) => {
       const totalPages = Math.ceil(totalCount / limitNum);
 
       res.status(200).json({
-        success: true,
+        status: true,
         data: dataResult.rows,
         page: pageNum,
         limit: limitNum,
@@ -177,38 +251,105 @@ exports.getAllLeads = async (req, res) => {
       client.release();
     }
   } catch (err) {
-    console.error('Get leads error:', err);
+    console.error('Get leads error:', err.stack);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+exports.getLeadsByCompanyId = async (req, res) => {
+  const { companyId } = req.params;
 
-// READ ONE
-exports.getLeadById = async (req, res) => {
-  const { id } = req.params;
+  // Validate companyId
+  if (!companyId || !companyId.trim()) {
+    return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM leads WHERE id = $1', [id]);
-      if (result.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
-      res.json(result.rows[0]);
+      const result = await client.query(
+        `
+        SELECT 
+          leads.*,
+          u1.name AS assignedTo_name,
+          u2.name AS updatedBy_name,
+          c.name AS customer_name
+        FROM leads
+        LEFT JOIN users u1 ON leads.assignedTo = u1.id
+        LEFT JOIN users u2 ON leads.updatedById = u2.id
+        LEFT JOIN customers c ON leads.customerId = c.id
+        WHERE leads.companyId = $1
+        ORDER BY leads.createdAt DESC
+        `,
+        [companyId]
+      );
+
+      res.status(200).json({
+        status: true,
+        data: result.rows,
+        message: "Leads fetched successfully"
+      });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Get lead error:', err);
+    console.error('Get leads by companyId error:', err.stack);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// UPDATE
+exports.getLeadById = async (req, res) => {
+  const { id } = req.params;
+
+  // Validate UUID
+  if (!isUUID(id)) {
+    return res.status(400).json({ error: 'Invalid id: Must be a valid UUID' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT 
+          leads.*,
+          u1.name AS assignedTo_name,
+          u2.name AS updatedBy_name,
+          c.name AS customer_name
+        FROM leads
+        LEFT JOIN users u1 ON leads.assignedTo = u1.id
+        LEFT JOIN users u2 ON leads.updatedById = u2.id
+        LEFT JOIN customers c ON leads.customerId = c.id
+        WHERE leads.id = $1
+        `,
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      res.status(200).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Lead fetched successfully'
+      });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Get lead error:', err.stack);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 exports.updateLead = async (req, res) => {
   const { id } = req.params;
   const {
+    customerId,
     source,
     status,
-    assigned_to,
+    assignedTo,
     notes,
     leadName,
     updatedById,
@@ -216,46 +357,209 @@ exports.updateLead = async (req, res) => {
     stage,
     subCategory,
     isClose,
-    isCompleted
+    isCompleted,
+    phone,
+    isDeal,
+    companyId
   } = req.body;
 
+  // Validate UUID fields
+  if (customerId && !isUUID(customerId)) {
+    return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
+  }
+  if (assignedTo && !isUUID(assignedTo)) {
+    return res.status(400).json({ error: 'Invalid assignedTo: Must be a valid UUID' });
+  }
+  if (updatedById && !isUUID(updatedById)) {
+    return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
+  }
+  if (!isUUID(id)) {
+    return res.status(400).json({ error: 'Invalid id: Must be a valid UUID' });
+  }
+
+  // Validate phone format if provided
+  if (phone && !/^\d{10}$/.test(phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  }
+
+  // Validate companyId if provided
+  if (companyId && !companyId.trim()) {
+    return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
+      // Validate foreign keys
+      if (customerId) {
+        const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [customerId]);
+        if (customerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
+        }
+      }
+      if (assignedTo) {
+        const assignedCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assignedTo]);
+        if (assignedCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid assignedTo: User does not exist' });
+        }
+      }
+      if (updatedById) {
+        const updatedByCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [updatedById]);
+        if (updatedByCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid updatedById: User does not exist' });
+        }
+      }
+
       const result = await client.query(
         `UPDATE leads
-         SET source = $1, status = $2, assigned_to = $3, notes = $4, leadName = $5,
-             updatedById = $6, updatedOn = $7, stage = $8, subCategory = $9, isClose = $10, isCompleted = $11
-         WHERE id = $12 RETURNING *`,
-        [source, status, assigned_to, notes, leadName, updatedById, updatedOn, stage, subCategory, isClose, isCompleted, id]
+         SET customerId = $1, source = $2, status = $3, assignedTo = $4, notes = $5,
+             leadName = $6, updatedById = $7, updatedOn = $8, stage = $9, subCategory = $10,
+             isClose = $11, isCompleted = $12, phone = $13, isDeal = $14, companyId = $15
+         WHERE id = $16 RETURNING *`,
+        [
+          customerId, source, status, assignedTo, notes, leadName, updatedById,
+          updatedOn, stage, subCategory, isClose, isCompleted, phone, isDeal, companyId, id
+        ]
       );
-      if (result.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
-      res.json(result.rows[0]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      res.status(200).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Lead updated successfully'
+      });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Update lead error:', err);
+    console.error('Update lead error:', err.stack);
+    if (err.code === '23503') {
+      return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// DELETE
-exports.deleteLead = async (req, res) => {
+exports.patchLead = async (req, res) => {
   const { id } = req.params;
+  const fields = Object.entries(req.body);
+
+  // Validate that at least one field is provided
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'At least one field must be provided for update' });
+  }
+
+  // Validate UUID fields if provided
+  if (req.body.customerId && !isUUID(req.body.customerId)) {
+    return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
+  }
+  if (req.body.assignedTo && !isUUID(req.body.assignedTo)) {
+    return res.status(400).json({ error: 'Invalid assignedTo: Must be a valid UUID' });
+  }
+  if (req.body.updatedById && !isUUID(req.body.updatedById)) {
+    return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
+  }
+  if (!isUUID(id)) {
+    return res.status(400).json({ error: 'Invalid id: Must be a valid UUID' });
+  }
+
+  // Validate phone format if provided
+  if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  }
+
+  // Validate companyId if provided
+  if (req.body.companyId && !req.body.companyId.trim()) {
+    return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      const result = await client.query('DELETE FROM leads WHERE id = $1 RETURNING *', [id]);
-      if (result.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
-      res.json({ message: 'Lead deleted successfully' });
+      // Validate foreign keys if provided
+      if (req.body.customerId) {
+        const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [req.body.customerId]);
+        if (customerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
+        }
+      }
+      if (req.body.assignedTo) {
+        const assignedCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.assignedTo]);
+        if (assignedCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid assignedTo: User does not exist' });
+        }
+      }
+      if (req.body.updatedById) {
+        const updatedByCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.updatedById]);
+        if (updatedByCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid updatedById: User does not exist' });
+        }
+      }
+
+      const setString = fields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
+      const values = fields.map(([, value]) => value);
+
+      const result = await client.query(
+        `UPDATE leads SET ${setString} WHERE id = $${fields.length + 1} RETURNING *`,
+        [...values, id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+        res.status(200).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Lead patched successfully',
+      })
+      
+    } catch (err) {
+      console.error('Patch lead error:', err);
+      if (err.code === '23503') {
+        return res.json({ error: 'Invalid foreign key value', details: err.detail });
+      }
+      if (err.code === '23505') {
+        return res.json({ error: 'Duplicate key value', details: err.detail });
+      }
+      res.status(500).json({ error: 'Internal server error' });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Delete lead error:', err);
+    console.error('Patch lead error:', err.stack);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+
+}
+exports.deleteLead = async (req, res) => {
+  const { id } = req.params;
+
+  // Validate UUID
+  if (!isUUID(id)) {
+    return res.status(400).json({ error: 'Invalid id: Must be a valid UUID' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      const result = await client.query('DELETE FROM leads WHERE id = $1 RETURNING *', [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      res.status(200).json({
+        status: true,
+        message: 'Lead deleted successfully'
+      });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Delete lead error:', err.stack);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

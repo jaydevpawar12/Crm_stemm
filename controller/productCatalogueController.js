@@ -88,7 +88,12 @@ if (!validator.isUUID(createdById)) {
         [createdById, sanitizedLink, sanitizedImage, sanitizedCatalogueName]
       );
 
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product Catalouge Fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -144,6 +149,7 @@ exports.getAllProductCatalogues = async (req, res) => {
       const totalPages = Math.ceil(totalItems / limit);
 
       res.json({
+        status:true,
         data: result.rows,
         pagination: {
           page,
@@ -195,7 +201,12 @@ exports.getProductCatalogueById = async (req, res) => {
         return res.status(404).json({ error: 'Catalogue not found' });
       }
 
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product Catalouge Fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -220,7 +231,12 @@ exports.updateProductCatalogue = async (req, res) => {
         [link, image, catalogueName, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Catalogue not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product Catalouge Update successfully'
+      });
     } finally {
       client.release();
     }

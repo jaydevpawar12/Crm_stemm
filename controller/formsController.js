@@ -38,7 +38,15 @@ exports.createForm = async (req, res) => {
          RETURNING *`,
         [ formName, formType, createdById, isLeadForm, companyId]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+      const form=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        form
+      },
+      message:" form Create Successfully"
+      })
     } catch (err) {
       console.error('Create form error:', err.stack);
       if (err.code === '23503') {
@@ -65,7 +73,15 @@ exports.getAllForms = async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM public.forms ORDER BY createdAt DESC');
-      res.json(result.rows);
+      // res.json(result.rows);
+      const form=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        form
+      },
+      message:" form fetch Successfully"
+      })
     } finally {
       client.release();
     }
@@ -87,7 +103,15 @@ exports.getFormById = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      const form=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        form
+      },
+      message:" form fetch Successfully"
+      })
     } finally {
       client.release();
     }
@@ -128,7 +152,15 @@ exports.updateForm = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      const form=result.rows
+      res.status(200).json({
+        status:true,
+      data:{
+        form
+      },
+      message:" form update Successfully"
+      })
     } catch (err) {
       console.error('Update form error:', err.stack);
       if (err.code === '23503') {

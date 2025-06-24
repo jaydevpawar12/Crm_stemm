@@ -1,10 +1,5 @@
-  // const { initializePool } = require('../db');
-  const { pool } = require('../db');
-
-// Create User
-
- // Assuming pool is exported from pg.js
-const { validate: isUUID } = require('uuid'); // Add uuid package for validation
+const { pool } = require('../db');
+const { validate: isUUID } = require('uuid');
 
 exports.createUser = async (req, res) => {
   const {
@@ -32,7 +27,7 @@ exports.createUser = async (req, res) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
 
-  // Validate other fields (add more as needed)
+  // Validate other fields
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
   if (countrycode && !/^[A-Z]{2}$/.test(countrycode)) return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
   if (dialcode && !/^\+\d{1,4}$/.test(dialcode)) return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
@@ -57,7 +52,7 @@ exports.createUser = async (req, res) => {
         }
       }
 
-      // Validate role_id exists in roles table (assuming roles table exists)
+      // Validate role_id exists in roles table
       if (role_id) {
         const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [role_id]);
         if (roleCheck.rows.length === 0) {
@@ -65,7 +60,7 @@ exports.createUser = async (req, res) => {
         }
       }
 
-      // Validate departmentid exists in departments table (assuming departments table exists)
+      // Validate departmentid exists in departments table
       if (departmentid) {
         const deptCheck = await client.query('SELECT 1 FROM departments WHERE id = $1', [departmentid]);
         if (deptCheck.rows.length === 0) {
@@ -96,7 +91,12 @@ exports.createUser = async (req, res) => {
         ]
       );
 
-      res.status(201).json(result.rows[0]);
+      const users = result.rows;
+      res.status(200).json({
+        status: true,
+        data: { users },
+        message: "Fetched successfully"
+      });
     } catch (err) {
       console.error('Create user error:', err.stack);
       if (err.code === '23503') {
@@ -118,106 +118,12 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// Get All Users
-// exports.getAllUsers = async (req, res) => {
-//   try {
-//     const client = await pool.connect();
-//     try {
-//       const result = await client.query(`
-//         SELECT 
-//           u1.*,
-//           u2.name AS reportingmanagername,
-//           u3.name AS crossreportingmanagername
-//         FROM users u1
-//         LEFT JOIN users u2 ON u1.reportingmanagerid = u2.id
-//         LEFT JOIN users u3 ON u1.crossreportingmanagerid = u3.id
-//       `);
-//       const users = result.rows;
-//       const totalCount = users.length;
-//       res.status(200).json({
-//         success: true,
-//         data: { users, totalCount },
-//         message: "Fetch successfully"
-//       });
-//     } finally {
-//       client.release();
-//     }
-//   } catch (err) {
-//     console.error('Get All Users Error:', err);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// };
-
-// exports.getAllUsers = async (req, res) => {
-//   try {
-//     const client = await pool.connect();
-//     try {
-//       // Extract query parameters
-//       const { reportingmanagerid, departmentid } = req.query;
-
-//       // Validate reportingmanagerid format
-//       // const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-//       // if (reportingmanagerid && !uuidRegex.test(reportingmanagerid)) {
-//       //   return res.status(400).json({ error: 'Invalid reportingmanagerid format: Must be a valid UUID' });
-//       // }
-
-//       // Base query
-//       let query = `
-//         SELECT 
-//           u1.*,
-//           u2.name AS reportingmanagername,
-//           u3.name AS crossreportingmanagername
-//           d.name AS departmentname
-//         FROM users u1
-//         LEFT JOIN users u2 ON u1.reportingmanagerid = u2.id
-//         LEFT JOIN users u3 ON u1.crossreportingmanagerid = u3.id
-//         LEFT JOIN department d ON u1.departmentid = d.id
-//         WHERE 1=1
-//       `;
-
-//       // Array to hold query parameters
-//       const queryParams = [];
-//       let paramIndex = 1;
-
-//       // Add filter for reportingmanagerid if provided
-//       if (reportingmanagerid) {
-//         query += ` AND u1.reportingmanagerid = $${paramIndex} `;
-//         queryParams.push(reportingmanagerid);
-//         paramIndex++;
-//       }
-
-//       // Add filter for departmentid if provided
-//       if (departmentid) {
-//         query += ` AND u1.departmentid = $${paramIndex}`;
-//         queryParams.push(departmentid);
-//         paramIndex++;
-//       }
-
-//       // Execute the query
-//       const result = await client.query(query, queryParams);
-//       const users = result.rows;
-//       const totalCount = users.length;
-
-//       res.status(200).json({
-//         success: true,
-//         data: { users, totalCount },
-//         message: "Fetch successfully"
-//       });
-//     } finally {
-//       client.release();
-//     }
-//   } catch (err) {
-//     console.error('Get All Users Error:', err);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// };
-
 exports.getAllUsers = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
       // Extract query parameters
-      const { reportingmanagerid, departmentid, page = 1, limit = 10 } = req.query;
+      const { reportingmanagerid, departmentid, companyid, page = 1, limit = 10 } = req.query;
 
       // UUID validation regex
       const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -230,6 +136,11 @@ exports.getAllUsers = async (req, res) => {
       // Validate departmentid format
       if (departmentid && !uuidRegex.test(departmentid)) {
         return res.status(400).json({ error: 'Invalid departmentid format: Must be a valid UUID' });
+      }
+
+      // Validate companyid format (string, non-empty)
+      if (companyid && !companyid.trim()) {
+        return res.status(400).json({ error: 'Invalid companyid: Must be a non-empty string' });
       }
 
       // Convert page and limit to integers and ensure they are positive
@@ -277,6 +188,13 @@ exports.getAllUsers = async (req, res) => {
         paramIndex++;
       }
 
+      // Add filter for companyid if provided
+      if (companyid) {
+        query += ` AND u1.companyid = $${paramIndex} `;
+        queryParams.push(companyid);
+        paramIndex++;
+      }
+
       // Add pagination
       query += ` ORDER BY u1.id LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       queryParams.push(limitNum, offset);
@@ -300,6 +218,11 @@ exports.getAllUsers = async (req, res) => {
         countParams.push(departmentid);
         countParamIndex++;
       }
+      if (companyid) {
+        countQuery += ` AND u1.companyid = $${countParamIndex} `;
+        countParams.push(companyid);
+        countParamIndex++;
+      }
 
       // Execute queries
       const [result, countResult] = await Promise.all([
@@ -311,7 +234,7 @@ exports.getAllUsers = async (req, res) => {
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
-        success: true,
+        status: true,
         data: {
           users,
           totalCount,
@@ -333,7 +256,48 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
+exports.getUsersByCompanyId = async (req, res) => {
+  const { companyid } = req.params;
 
+  // Validate companyid (string, non-empty)
+  if (!companyid || !companyid.trim()) {
+    return res.status(400).json({ error: 'Invalid companyid: Must be a non-empty string' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT 
+          u1.*,
+          u2.name AS reportingmanagername,
+          u3.name AS crossreportingmanagername,
+          d.name AS departmentname
+        FROM users u1
+        LEFT JOIN users u2 ON u1.reportingmanagerid = u2.id
+        LEFT JOIN users u3 ON u1.crossreportingmanagerid = u3.id
+        LEFT JOIN department d ON u1.departmentid = d.id
+        WHERE u1.companyid = $1
+        ORDER BY u1.id
+        `,
+        [companyid]
+      );
+
+      const users = result.rows;
+      res.status(200).json({
+        status: true,
+        data: { users },
+        message: "Fetched successfully"
+      });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Get Users By CompanyId Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 
 exports.getAllReportingManagers = async (req, res) => {
   try {
@@ -353,7 +317,7 @@ exports.getAllReportingManagers = async (req, res) => {
     }
 
     return res.json({
-      success: true,
+      status: true,
       data: managers,
       message: "All Managers fetched successfully"
     });
@@ -363,24 +327,27 @@ exports.getAllReportingManagers = async (req, res) => {
   }
 };
 
-// Get Single User
-  exports.getUserById = async (req, res) => {
-    const { id } = req.params;
+exports.getUserById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const client = await pool.connect();
     try {
-      // const pool = await initializePool();
-      const client = await pool.connect();
-      try {
-        const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-        res.json(result.rows[0]);
-      } finally {
-        client.release();
-      }
-    } catch (err) {
-      console.error('Get User Error:', err);
-      res.status(500).json({ error: 'Internal Server Error' });
+      const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+      const user = result.rows;
+      res.status(200).json({
+        status: true,
+        data: { user },
+        message: "Fetched successfully"
+      });
+    } finally {
+      client.release();
     }
-  };
+  } catch (err) {
+    console.error('Get User Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 
 exports.getUserByEmailOrPhone = async (req, res) => {
   let { email, phone } = req.body;
@@ -390,16 +357,12 @@ exports.getUserByEmailOrPhone = async (req, res) => {
     return res.status(400).json({ error: 'At least one of email or phone is required' });
   }
 
-  // Trim and decode phone to handle URL encoding (e.g., %2B → +)
+  // Trim and decode phone to handle URL encoding
   if (phone) {
     phone = decodeURIComponent(phone.trim());
   }
 
-  // Debug: Log raw input
-  console.log('Raw phone input:', phone);
-
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       let query = 'SELECT * FROM users WHERE FALSE';
@@ -413,25 +376,20 @@ exports.getUserByEmailOrPhone = async (req, res) => {
       }
 
       if (phone) {
-        // Try exact match first (e.g., +919192939495)
         query += ` OR phone = $${paramIndex}`;
         values.push(phone);
         paramIndex++;
 
-        // If input is digits-only and 10 digits, try +91 prefix and digits-only
         const digitsOnly = phone.replace(/\D/g, '');
         if (!phone.startsWith('+') && digitsOnly.length === 10) {
-          query += ` OR phone = $${paramIndex}`; // Try +91 prefix
+          query += ` OR phone = $${paramIndex}`;
           values.push(`+91${digitsOnly}`);
           paramIndex++;
-          query += ` OR phone = $${paramIndex}`; // Try digits-only
+          query += ` OR phone = $${paramIndex}`;
           values.push(digitsOnly);
           paramIndex++;
         }
       }
-
-      // Debug: Log query and values (remove in production)
-      console.log('Query:', query, 'Values:', values);
 
       const result = await client.query(query, values);
 
@@ -439,8 +397,12 @@ exports.getUserByEmailOrPhone = async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Return the first matching user
-      res.status(200).json(result.rows[0]);
+      const user = result.rows;
+      res.status(200).json({
+        status: true,
+        data: { user },
+        message: "Fetched successfully"
+      });
     } catch (error) {
       console.error('Query execution error:', error);
       throw error;
@@ -453,7 +415,6 @@ exports.getUserByEmailOrPhone = async (req, res) => {
   }
 };
 
-// Update User
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
   const fields = Object.entries(req.body);
@@ -461,7 +422,6 @@ exports.updateUser = async (req, res) => {
   const values = fields.map(([, value]) => value);
 
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -469,7 +429,12 @@ exports.updateUser = async (req, res) => {
         [...values, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-      res.json(result.rows[0]);
+      const user = result.rows;
+      res.status(200).json({
+        status: true,
+        data: { user },
+        message: "Updated successfully"
+      });
     } finally {
       client.release();
     }
@@ -479,15 +444,119 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// Delete User
+exports.patchUser = async (req, res) => {
+  const { id } = req.params;
+  const fields = Object.entries(req.body);
+  
+  // Validate that at least one field is provided
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'At least one field must be provided for update' });
+  }
+
+  // Validate fields if they are provided
+  if (req.body.email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(req.body.email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+  }
+  if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  }
+  if (req.body.countrycode && !/^[A-Z]{2}$/.test(req.body.countrycode)) {
+    return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
+  }
+  if (req.body.dialcode && !/^\+\d{1,4}$/.test(req.body.dialcode)) {
+    return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
+  }
+  if (req.body.employeetype && !['office', 'field'].includes(req.body.employeetype)) {
+    return res.status(400).json({ error: 'Invalid employeetype: Must be office or field' });
+  }
+  if (req.body.role_id && !isUUID(req.body.role_id)) {
+    return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
+  }
+  if (req.body.reportingmanagerid && !isUUID(req.body.reportingmanagerid)) {
+    return res.status(400).json({ error: 'Invalid reportingmanagerid: Must be a valid UUID' });
+  }
+  if (req.body.crossreportingmanagerid && !isUUID(req.body.crossreportingmanagerid)) {
+    return res.status(400).json({ error: 'Invalid crossreportingmanagerid: Must be a valid UUID' });
+  }
+  if (req.body.departmentid && !isUUID(req.body.departmentid)) {
+    return res.status(400).json({ error: 'Invalid departmentid: Must be a valid UUID' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      // Validate foreign keys if provided
+      if (req.body.reportingmanagerid) {
+        const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.reportingmanagerid]);
+        if (managerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid reportingmanagerid: User does not exist' });
+        }
+      }
+      if (req.body.crossreportingmanagerid) {
+        const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.crossreportingmanagerid]);
+        if (crossManagerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid crossreportingmanagerid: User does not exist' });
+        }
+      }
+      if (req.body.role_id) {
+        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [req.body.role_id]);
+        if (roleCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid role_id: Role does not exist' });
+        }
+      }
+      if (req.body.departmentid) {
+        const deptCheck = await client.query('SELECT 1 FROM departments WHERE id = $1', [req.body.departmentid]);
+        if (deptCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
+        }
+      }
+
+      const setString = fields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
+      const values = fields.map(([, value]) => value);
+
+      const result = await client.query(
+        `UPDATE users SET ${setString} WHERE id = $${fields.length + 1} RETURNING *`,
+        [...values, id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = result.rows;
+      res.status(200).json({
+        status: true,
+        data: { user },
+        message: "Patched successfully"
+      });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Patch User Error:', err);
+    if (err.code === '23503') {
+      return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+    }
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
+    }
+    if (err.code === '22P02') {
+      return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 exports.deleteUser = async (req, res) => {
   const { id } = req.params;
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       await client.query('DELETE FROM users WHERE id = $1', [id]);
-      res.json({ message: 'User deleted successfully' });
+      res.json({ status: true, message: 'User deleted successfully' });
     } finally {
       client.release();
     }
