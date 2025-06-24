@@ -16,7 +16,6 @@ exports.createDepartment = async (req, res) => {
 
   // Validate UUID fields
   if (!isUUID(createById)) return res.status(400).json({ status: false, error: 'Invalid createById: Must be a valid UUID' });
-  if (!isUUID(companyId)) return res.status(400).json({ status: false, error: 'Invalid companyId: Must be a valid UUID' });
 
   // Validate name format (e.g., max length, no special characters)
   if (name.length > 100) return res.status(400).json({ status: false, error: 'Name must not exceed 100 characters' });
@@ -33,10 +32,10 @@ exports.createDepartment = async (req, res) => {
       }
 
       // Validate companyId exists in companies table (assuming companies table exists)
-      const companyCheck = await client.query('SELECT 1 FROM companies WHERE id = $1', [companyId]);
-      if (companyCheck.rows.length === 0) {
-        return res.status(400).json({ status: false, error: 'Invalid companyId: Company does not exist' });
-      }
+      // const companyCheck = await client.query('SELECT 1 FROM companies WHERE id = $1', [companyId]);
+      // if (companyCheck.rows.length === 0) {
+      //   return res.status(400).json({ status: false, error: 'Invalid companyId: Company does not exist' });
+      // }
 
       const result = await client.query(
         'INSERT INTO department ( name, createById, companyId) VALUES ($1, $2, $3) RETURNING *',

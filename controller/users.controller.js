@@ -91,10 +91,10 @@ exports.createUser = async (req, res) => {
         ]
       );
 
-      const users = result.rows;
+      // const users = result.rows;
       res.status(200).json({
         status: true,
-        data: { users },
+        data: result.rows[0],
         message: "Fetched successfully"
       });
     } catch (err) {
@@ -230,13 +230,13 @@ exports.getAllUsers = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      const users = result.rows;
+      const dataList = result.rows;
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
         status: true,
         data: {
-          users,
+          dataList,
           totalCount,
           page: pageNum,
           limit: limitNum,
@@ -284,10 +284,10 @@ exports.getUsersByCompanyId = async (req, res) => {
         [companyid]
       );
 
-      const users = result.rows;
+      const dataList = result.rows;
       res.status(200).json({
         status: true,
-        data: { users },
+        data: { dataList },
         message: "Fetched successfully"
       });
     } finally {
@@ -334,10 +334,10 @@ exports.getUserById = async (req, res) => {
     try {
       const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
       if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-      const user = result.rows;
+      // const user = result.rows;
       res.status(200).json({
         status: true,
-        data: { user },
+        data: result.rows[0],
         message: "Fetched successfully"
       });
     } finally {
@@ -429,10 +429,10 @@ exports.updateUser = async (req, res) => {
         [...values, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-      const user = result.rows;
+      // const user = result.rows;
       res.status(200).json({
         status: true,
-        data: { user },
+        data:  result.rows[0],
         message: "Updated successfully"
       });
     } finally {
@@ -526,10 +526,10 @@ exports.patchUser = async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const user = result.rows;
+      // const user = result.rows;
       res.status(200).json({
         status: true,
-        data: { user },
+        data:  result.rows[0],
         message: "Patched successfully"
       });
     } finally {
