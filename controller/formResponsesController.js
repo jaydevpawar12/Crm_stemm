@@ -44,12 +44,10 @@ exports.createFormResponse = async (req, res) => {
         [ formId, formFieldId, userId, responseValue]
       );
       // res.status(201).json(result.rows[0]);
-      const formResponses=result.rows
+      // const formResponses=result.rows
       res.status(200).json({
         status:true,
-      data:{
-        formResponses
-      },
+      data:result.rows[0],
       message:" formResponses Create Successfully"
       })
     } catch (err) {
@@ -86,11 +84,11 @@ exports.getAllFormResponses = async (req, res) => {
         ORDER BY fr.submittedAt DESC
       `);
       // res.json(result.rows);
-      const formResponses=result.rows
+      const dataList=result.rows
       res.status(200).json({
         status:true,
       data:{
-        formResponses
+        dataList
       },
       message:" formResponses Fetch Successfully"
       })
@@ -123,12 +121,10 @@ exports.getFormResponseById = async (req, res) => {
         return res.status(404).json({ error: 'Form response not found' });
       }
       // res.json(result.rows[0]);
-      const formResponses=result.rows
+      // const formResponses=result.rows
       res.status(200).json({
         status:true,
-      data:{
-        formResponses
-      },
+      data:result.rows[0],
       message:" formResponses fetch single  Successfully"
       })
     } finally {
@@ -188,12 +184,10 @@ exports.updateFormResponse = async (req, res) => {
         return res.status(404).json({ error: 'Form response not found' });
       }
       // res.json(result.rows[0]);
-      const formResponses=result.rows
+      // const formResponses=result.rows
       res.status(200).json({
         status:true,
-      data:{
-        formResponses
-      },
+      data:result.rows[0],
       message:" formResponses update Successfully"
       })
     } catch (err) {

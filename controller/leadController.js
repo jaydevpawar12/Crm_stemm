@@ -240,7 +240,7 @@ exports.getAllLeads = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: dataResult.rows,
+        data: {dataList:dataResult.rows},
         page: pageNum,
         limit: limitNum,
         totalCount,
@@ -286,7 +286,7 @@ exports.getLeadsByCompanyId = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: result.rows,
+        data: {dataList:result.rows[0]},
         message: "Leads fetched successfully"
       });
     } finally {

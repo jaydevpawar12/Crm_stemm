@@ -68,7 +68,7 @@ exports.createDepartment = async (req, res) => {
   }
 };
 
-// Get All Departments
+
 exports.getAllDepartments = async (req, res) => {
   try {
     const client = await pool.connect();
@@ -76,9 +76,9 @@ exports.getAllDepartments = async (req, res) => {
       // Extract query parameters
       const { companyId, page = 1, limit = 10 } = req.query;
 
-      // Validate UUID for companyId if provided
-      if (companyId && !isUUID(companyId)) {
-        return res.status(400).json({ status: false, error: 'Invalid companyId format: Must be a valid UUID' });
+      // Validate companyId as a non-empty string if provided
+      if (companyId && !companyId.trim()) {
+        return res.status(400).json({ status: false, error: 'Invalid companyId: Must be a non-empty string' });
       }
 
       // Convert page and limit to integers and ensure they are positive
@@ -98,11 +98,9 @@ exports.getAllDepartments = async (req, res) => {
       let query = `
         SELECT 
           d.*,
-          u.name AS created_by_name,
-          c.name AS company_name
+          u.name AS created_by_name
         FROM department d
         LEFT JOIN users u ON d.createById = u.id
-        LEFT JOIN companies c ON d.companyId = c.id
         WHERE 1=1
       `;
 
@@ -112,8 +110,8 @@ exports.getAllDepartments = async (req, res) => {
 
       // Add filter for companyId if provided
       if (companyId) {
-        query += ` AND d.companyId = $${paramIndex}::uuid `;
-        queryParams.push(companyId);
+        query += ` AND TRIM(LOWER(d.companyId)) = TRIM(LOWER($${paramIndex})) `;
+        queryParams.push(companyId.trim());
         paramIndex++;
       }
 
@@ -131,10 +129,16 @@ exports.getAllDepartments = async (req, res) => {
       let countParamIndex = 1;
 
       if (companyId) {
-        countQuery += ` AND d.companyId = $${countParamIndex}::uuid `;
-        countParams.push(companyId);
+        countQuery += ` AND TRIM(LOWER(d.companyId)) = TRIM(LOWER($${countParamIndex})) `;
+        countParams.push(companyId.trim());
         countParamIndex++;
       }
+
+      // Log queries for debugging
+      console.log('Query:', query);
+      console.log('Query Params:', queryParams);
+      console.log('Count Query:', countQuery);
+      console.log('Count Params:', countParams);
 
       // Execute queries
       const [result, countResult] = await Promise.all([
@@ -142,13 +146,13 @@ exports.getAllDepartments = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      const departments = result.rows;
+      const dataList = result.rows;
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
         status: true,
         data: {
-          departments,
+          dataList,
           totalCount,
           page: pageNum,
           limit: limitNum,
@@ -161,9 +165,6 @@ exports.getAllDepartments = async (req, res) => {
     }
   } catch (err) {
     console.error('Get All Departments Error:', err.stack);
-    if (err.code === '22023') {
-      return res.status(400).json({ status: false, error: 'Invalid UUID format in query parameters' });
-    }
     res.status(500).json({ status: false, error: 'Internal Server Error', details: err.message });
   }
 };

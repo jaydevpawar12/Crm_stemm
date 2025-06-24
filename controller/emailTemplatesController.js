@@ -39,7 +39,7 @@ exports.getAllEmailTemplates = async (req, res) => {
       // res.json(result.rows);
        res.status(201).json({
         status: true,
-        data: result.rows[0],
+        data:{ dataList:result.rows[0]},
         message: 'EmailTemplate Fetch successfully'
       });
     } finally {

@@ -151,7 +151,7 @@ exports.getAllNotes = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: dataResult.rows,
+        data: {dataList:dataResult.rows},
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -206,7 +206,7 @@ exports.getNotesByLeadId = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: result.rows,
+        data: result.rows[0],
         message: 'Notes fetched successfully'
       });
     } catch (err) {

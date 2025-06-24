@@ -77,12 +77,10 @@ exports.createFormField = async (req, res) => {
         ]
       );
       // res.status(201).json(result.rows[0]);
-      const formFileld=result.rows
+      // const formFileld=result.rows
       res.status(200).json({
         status:true,
-      data:{
-        formFileld
-      },
+      data:result.rows[0],
       message:" formFileld Create Successfully"
       })
     } catch (err) {
@@ -117,12 +115,10 @@ exports.getAllFormFields = async (req, res) => {
         ORDER BY ff.fieldOrder ASC
       `);
       // res.json(result.rows);
-      const formFilelds=result.rows
+      // const formFilelds=result.rows
       res.status(200).json({
         status:true,
-      data:{
-        formFilelds
-      },
+      data:{dataList:result.rows[0]},
       message:" formFileld Fetch Successfully"
       })
     } finally {
@@ -152,12 +148,10 @@ exports.getFormFieldById = async (req, res) => {
         return res.status(404).json({ error: 'Form field not found' });
       }
       res.json(result.rows[0]);
-      const formFileld=result.rows
+      // const formFileld=result.rows
       res.status(200).json({
         status:true,
-      data:{
-        formFileld
-      },
+      data:result.rows[0],
       message:" formFileld Create Successfully"
       })
     } finally {
@@ -250,12 +244,10 @@ exports.updateFormField = async (req, res) => {
         return res.status(404).json({ error: 'Form field not found' });
       }
       // res.json(result.rows[0]);
-       const formFileld=result.rows
+      //  const formFileld=result.rows
       res.status(200).json({
         status:true,
-      data:{
-        formFileld
-      },
+      data:result.rows[0],
       message:" formFileld update Successfully"
       })
     } catch (err) {

@@ -63,7 +63,7 @@ exports.createCustomer = async (req, res) => {
 
       res.status(201).json({
         success: true,
-        data: { customers: result.rows[0] },
+        data:result.rows[0] ,
         message: 'Customer created successfully'
       });
     } catch (err) {
@@ -181,13 +181,13 @@ exports.getCustomers = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      const customers = result.rows;
+      const dataList = result.rows;
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
         success: true,
         data: {
-          customers,
+          dataList,
           totalCount,
           page: pageNum,
           limit: limitNum,
@@ -236,7 +236,7 @@ exports.getCustomerById = async (req, res) => {
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
         success: true,
-        data: { customer: result.rows[0] },
+        data: result.rows[0] ,
         message: 'Customer fetched successfully'
       });
     } catch (err) {
@@ -315,7 +315,7 @@ exports.updateCustomer = async (req, res) => {
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
         success: true,
-        data: { customer: result.rows[0] },
+        data: result.rows[0] ,
         message: 'Customer updated successfully'
       });
     } catch (err) {
