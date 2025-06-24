@@ -414,109 +414,109 @@ exports.getUserByEmailOrPhone = async (req, res) => {
   }
 };
 
-exports.updateUser  = async (req, res) => {
-  const { id } = req.params;
-  const fields = Object.entries(req.body);
+  exports.updateUser  = async (req, res) => {
+    const { id } = req.params;
+    const fields = Object.entries(req.body);
 
-  // Validate that at least one field is provided
-  if (fields.length === 0) {
-    return res.status(400).json({ error: 'At least one field must be provided for update' });
-  }
-
-  // Prepare the SET clause and values for the update query
-  const setString = fields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
-  const values = fields.map(([, value]) => value);
-
-  // Validate fields if they are provided
-  if (req.body.email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(req.body.email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+    // Validate that at least one field is provided
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'At least one field must be provided for update' });
     }
-  }
-  if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
-    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
-  }
-  if (req.body.countrycode && !/^[A-Z]{2}$/.test(req.body.countrycode)) {
-    return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
-  }
-  if (req.body.dialcode && !/^\+\d{1,4}$/.test(req.body.dialcode)) {
-    return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
-  }
- 
-  if (req.body.role_id && !isUUID(req.body.role_id)) {
-    return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
-  }
-  if (req.body.reportingmanagerid && !isUUID(req.body.reportingmanagerid)) {
-    return res.status(400).json({ error: 'Invalid reportingmanagerid: Must be a valid UUID' });
-  }
-  if (req.body.crossreportingmanagerid && !isUUID(req.body.crossreportingmanagerid)) {
-    return res.status(400).json({ error: 'Invalid crossreportingmanagerid: Must be a valid UUID' });
-  }
-  if (req.body.departmentid && !isUUID(req.body.departmentid)) {
-    return res.status(400).json({ error: 'Invalid departmentid: Must be a valid UUID' });
-  }
 
-  try {
-    const client = await pool.connect();
+    // Prepare the SET clause and values for the update query
+    const setString = fields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
+    const values = fields.map(([, value]) => value);
+
+    // Validate fields if they are provided
+    if (req.body.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(req.body.email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+    }
+    if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
+      return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+    }
+    if (req.body.countrycode && !/^[A-Z]{2}$/.test(req.body.countrycode)) {
+      return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
+    }
+    if (req.body.dialcode && !/^\+\d{1,4}$/.test(req.body.dialcode)) {
+      return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
+    }
+  
+    if (req.body.role_id && !isUUID(req.body.role_id)) {
+      return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
+    }
+    if (req.body.reportingmanagerid && !isUUID(req.body.reportingmanagerid)) {
+      return res.status(400).json({ error: 'Invalid reportingmanagerid: Must be a valid UUID' });
+    }
+    if (req.body.crossreportingmanagerid && !isUUID(req.body.crossreportingmanagerid)) {
+      return res.status(400).json({ error: 'Invalid crossreportingmanagerid: Must be a valid UUID' });
+    }
+    if (req.body.departmentid && !isUUID(req.body.departmentid)) {
+      return res.status(400).json({ error: 'Invalid departmentid: Must be a valid UUID' });
+    }
+
     try {
-      // Validate foreign keys if provided
-      if (req.body.reportingmanagerid) {
-        const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.reportingmanagerid]);
-        if (managerCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid reportingmanagerid: User does not exist' });
+      const client = await pool.connect();
+      try {
+        // Validate foreign keys if provided
+        if (req.body.reportingmanagerid) {
+          const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.reportingmanagerid]);
+          if (managerCheck.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid reportingmanagerid: User does not exist' });
+          }
         }
-      }
-      if (req.body.crossreportingmanagerid) {
-        const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.crossreportingmanagerid]);
-        if (crossManagerCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid crossreportingmanagerid: User does not exist' });
+        if (req.body.crossreportingmanagerid) {
+          const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.crossreportingmanagerid]);
+          if (crossManagerCheck.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid crossreportingmanagerid: User does not exist' });
+          }
         }
-      }
-      if (req.body.role_id) {
-        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [req.body.role_id]);
-        if (roleCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid role_id: Role does not exist' });
+        if (req.body.role_id) {
+          const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [req.body.role_id]);
+          if (roleCheck.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid role_id: Role does not exist' });
+          }
         }
-      }
-      if (req.body.departmentid) {
-        const deptCheck = await client.query('SELECT 1 FROM departments WHERE id = $1', [req.body.departmentid]);
-        if (deptCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
+        if (req.body.departmentid) {
+          const deptCheck = await client.query('SELECT 1 FROM department WHERE id = $1', [req.body.departmentid]);
+          if (deptCheck.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
+          }
         }
-      }
 
-      const result = await client.query(
-        `UPDATE users SET ${setString} WHERE id = $${fields.length + 1} RETURNING *`,
-        [...values, id]
-      );
+        const result = await client.query(
+          `UPDATE users SET ${setString} WHERE id = $${fields.length + 1} RETURNING *`,
+          [...values, id]
+        );
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'User  not found' });
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'User  not found' });
+        }
+
+        res.status(200).json({
+          status: true,
+          data: result.rows[0],
+          message: "Updated successfully"
+        });
+      } finally {
+        client.release();
       }
-
-      res.status(200).json({
-        status: true,
-        data: result.rows[0],
-        message: "Updated successfully"
-      });
-    } finally {
-      client.release();
+    } catch (err) {
+      console.error('Update User Error:', err);
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+      }
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
+      }
+      if (err.code === '22P02') {
+        return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
+      }
+      res.status(500).json({ error: 'Internal Server Error',details:err.message });
     }
-  } catch (err) {
-    console.error('Update User Error:', err);
-    if (err.code === '23503') {
-      return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
-    }
-    if (err.code === '23505') {
-      return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
-    }
-    if (err.code === '22P02') {
-      return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
-    }
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
+  };
 
 
 exports.patchUser = async (req, res) => {
