@@ -104,7 +104,7 @@ exports.getFormById = async (req, res) => {
       // res.json(result.rows[0]);
       // const form=result.rows
       res.status(200).json({
-        status:true,
+      status:true,
       data:result.rows[0],
       message:" form fetch Successfully"
       })
@@ -151,7 +151,7 @@ exports.updateForm = async (req, res) => {
       // res.json(result.rows[0]);
       // const form=result.rows
       res.status(200).json({
-        status:true,
+      status:true,
       data:result.rows[0],
       message:" form update Successfully"
       })
@@ -213,7 +213,7 @@ exports.searchForms = async (req, res) => {
       );
       res.json({
         success: true,
-        data: result.rows,
+        data: {dataList:result.rows[0]},
         message: result.rows.length > 0 ? 'Forms found' : 'No forms found matching the search criteria'
       });
     } finally {

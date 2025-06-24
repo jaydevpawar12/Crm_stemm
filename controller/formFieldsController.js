@@ -147,10 +147,10 @@ exports.getFormFieldById = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Form field not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
       // const formFileld=result.rows
       res.status(200).json({
-        status:true,
+      status:true,
       data:result.rows[0],
       message:" formFileld Create Successfully"
       })
@@ -246,7 +246,7 @@ exports.updateFormField = async (req, res) => {
       // res.json(result.rows[0]);
       //  const formFileld=result.rows
       res.status(200).json({
-        status:true,
+      status:true,
       data:result.rows[0],
       message:" formFileld update Successfully"
       })

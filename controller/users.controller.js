@@ -31,7 +31,6 @@ exports.createUser = async (req, res) => {
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
   if (countrycode && !/^[A-Z]{2}$/.test(countrycode)) return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
   if (dialcode && !/^\+\d{1,4}$/.test(dialcode)) return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
-  if (employeetype && !['office', 'field'].includes(employeetype)) return res.status(400).json({ error: 'Invalid employeetype: Must be office or field' });
 
   try {
     const client = await pool.connect();
@@ -444,9 +443,7 @@ exports.updateUser  = async (req, res) => {
   if (req.body.dialcode && !/^\+\d{1,4}$/.test(req.body.dialcode)) {
     return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
   }
-  if (req.body.employeetype && !['office', 'field'].includes(req.body.employeetype)) {
-    return res.status(400).json({ error: 'Invalid employeetype: Must be office or field' });
-  }
+ 
   if (req.body.role_id && !isUUID(req.body.role_id)) {
     return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
   }
@@ -547,9 +544,7 @@ exports.patchUser = async (req, res) => {
   if (req.body.dialcode && !/^\+\d{1,4}$/.test(req.body.dialcode)) {
     return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
   }
-  if (req.body.employeetype && !['office', 'field'].includes(req.body.employeetype)) {
-    return res.status(400).json({ error: 'Invalid employeetype: Must be office or field' });
-  }
+ 
   if (req.body.role_id && !isUUID(req.body.role_id)) {
     return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
   }

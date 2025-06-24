@@ -46,7 +46,7 @@ exports.createFormResponse = async (req, res) => {
       // res.status(201).json(result.rows[0]);
       // const formResponses=result.rows
       res.status(200).json({
-        status:true,
+      status:true,
       data:result.rows[0],
       message:" formResponses Create Successfully"
       })
@@ -123,7 +123,7 @@ exports.getFormResponseById = async (req, res) => {
       // res.json(result.rows[0]);
       // const formResponses=result.rows
       res.status(200).json({
-        status:true,
+      status:true,
       data:result.rows[0],
       message:" formResponses fetch single  Successfully"
       })
@@ -186,7 +186,7 @@ exports.updateFormResponse = async (req, res) => {
       // res.json(result.rows[0]);
       // const formResponses=result.rows
       res.status(200).json({
-        status:true,
+      status:true,
       data:result.rows[0],
       message:" formResponses update Successfully"
       })
