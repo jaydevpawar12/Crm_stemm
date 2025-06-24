@@ -115,13 +115,13 @@ exports.getAllCategories = async (req, res) => {
         client.query(countQuery)
       ]);
 
-      const categories = result.rows;
+      const dataList = result.rows;
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
         status: true,
         data: {
-          categories,
+          dataList,
           totalCount,
           page: pageNum,
           limit: limitNum,
@@ -201,7 +201,12 @@ exports.updateCategory = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Category Not Found' });
       }
-      res.status(200).json(result.rows[0]);
+      // res.status(200).json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product category Update successfully'
+      });
     } finally {
       client.release();
     }

@@ -15,7 +15,12 @@ exports.createStage = async (req, res) => {
         'INSERT INTO stage (id, name, categoryId) VALUES (gen_random_uuid(), $1, $2) RETURNING *',
         [name, categoryId]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+      res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'Stage Create successfully'
+            });
     } finally {
       client.release();
     }
@@ -31,7 +36,12 @@ exports.getAllStages = async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM stage');
-      res.json(result.rows);
+      // res.json(result.rows);
+      res.status(201).json({
+              status: true,
+              data: {dataList:result.rows[0]},
+              message: 'Stage Fetch successfully'
+            });
     } finally {
       client.release();
     }
@@ -49,7 +59,12 @@ exports.getStageById = async (req, res) => {
     try {
       const result = await client.query('SELECT * FROM stage WHERE id = $1', [id]);
       if (!result.rows.length) return res.status(404).json({ message: 'Stage not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'Stage Fetch successfully'
+            });
     } finally {
       client.release();
     }
@@ -76,7 +91,12 @@ exports.updateStage = async (req, res) => {
         [name, categoryId, id]
       );
       if (!result.rows.length) return res.status(404).json({ message: 'Stage not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'SendEmail Fetch successfully'
+            });
     } finally {
       client.release();
     }

@@ -121,7 +121,12 @@ exports.createProspect = async (req, res) => {
           enquiryCategoryId, productsCategory, customerId
         ]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Prospect created successfully'
+      });
     } finally {
       client.release();
     }
@@ -147,11 +152,11 @@ exports.getAllProspects = async (req, res) => {
         LEFT JOIN public.customers c ON p.customerid = c.id
         ORDER BY p.date DESC
       `);
-      const prospects=result.rows
+      const dataList=result.rows
       res.status(200).json({
         success:true,
         data:{
-          prospects
+          dataList
         },
         message:"Prospects Fetch Successfully"
       });
@@ -190,7 +195,12 @@ exports.getProspectById = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Prospect not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Prospect Fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -324,7 +334,12 @@ exports.updateProspect = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Prospect not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Prospect Update successfully'
+      });
     } finally {
       client.release();
     }

@@ -16,7 +16,12 @@
               'INSERT INTO roles (id, name, permissions) VALUES (gen_random_uuid(), $1, $2) RETURNING *',
               [name, permissions || {}]
             );
-            res.status(201).json(result.rows[0]);
+            // res.status(201).json(result.rows[0]);
+             res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'Role created successfully'
+            });
           } finally {
             client.release();
           }
@@ -32,7 +37,12 @@
           const client = await pool.connect();
           try {
             const result = await client.query('SELECT * FROM roles');
-            res.json(result.rows);
+            // res.json(result.rows);
+              res.status(201).json({
+              status: true,
+              data: {dataList:result.rows[0]},
+              message: 'Role Fetch successfully'
+            });
           } finally {
             client.release();
           }
@@ -50,7 +60,12 @@
           try {
             const result = await client.query('SELECT * FROM roles WHERE id = $1', [id]);
             if (!result.rows.length) return res.status(404).json({ message: 'Role not found' });
-            res.json(result.rows[0]);
+            // res.json(result.rows[0]);
+              res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'Role fetch successfully'
+            });
           } finally {
             client.release();
           }
@@ -72,7 +87,12 @@
               [name, permissions, id]
             );
             if (!result.rows.length) return res.status(404).json({ message: 'Role not found' });
-            res.json(result.rows[0]);
+            // res.json(result.rows[0]);
+              res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'Role Update successfully'
+            });
           } finally {
             client.release();
           }

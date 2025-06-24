@@ -26,7 +26,13 @@ exports.createSendEmail = async (req, res) => {
           attachmentUrls ? JSON.stringify(attachmentUrls.split(',').map(url => url.trim())) : null
         ]
       );
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+        res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'SendEmail created successfully'
+            });
+
     } finally {
       client.release();
     }
@@ -42,7 +48,12 @@ exports.getAllSendEmails = async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM public.SendEmails ORDER BY createdOn DESC');
-      res.json(result.rows);
+      // res.json(result.rows);
+        res.status(201).json({
+              status: true,
+              data: {dataList:result.rows[0]},
+              message: 'SendEmail Fetch successfully'
+            });
     } finally {
       client.release();
     }
@@ -63,7 +74,12 @@ exports.getSendEmailById = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Send email not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+            res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'SendEmail Fetch successfully'
+            });
     } finally {
       client.release();
     }
@@ -104,7 +120,12 @@ exports.updateSendEmail = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Send email not found' });
       }
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'SendEmail Update successfully'
+            });
     } finally {
       client.release();
     }

@@ -26,7 +26,12 @@ exports.createSubcategory = async (req, res) => {
         [name, categoryId, stageId]
       );
 
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+            res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'SubCategory Create successfully'
+            });
     } finally {
       client.release();
     }
@@ -42,7 +47,12 @@ exports.getAllSubcategories = async (req, res) => {
     const client = await pool.connect();
     try {
       const result = await client.query('SELECT * FROM subcategory');
-      res.json(result.rows);
+      // res.json(result.rows);
+      res.status(201).json({
+              status: true,
+              data: {dataList:result.rows[0]},
+              message: 'SubCategory Fetch successfully'
+            });
     } finally {
       client.release();
     }
@@ -60,7 +70,12 @@ exports.getSubcategoryById = async (req, res) => {
     try {
       const result = await client.query('SELECT * FROM subcategory WHERE id = $1', [id]);
       if (!result.rows.length) return res.status(404).json({ message: 'Subcategory not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+      res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'SubCategory Fetch successfully'
+            });
     } finally {
       client.release();
     }
@@ -97,7 +112,12 @@ exports.updateSubcategory = async (req, res) => {
         [name, categoryId, stageId, id]
       );
       if (!result.rows.length) return res.status(404).json({ message: 'Subcategory not found' });
-      res.json(result.rows[0]);
+      // res.json(result.rows[0]);
+       res.status(201).json({
+              status: true,
+              data: result.rows[0],
+              message: 'SubCategory Update successfully'
+            });
     } finally {
       client.release();
     }

@@ -122,7 +122,12 @@ exports.createProduct = async (req, res) => {
         ]
       );
 
-      res.status(201).json(result.rows[0]);
+      // res.status(201).json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product created successfully'
+      });
     } finally {
       client.release();
     }
@@ -229,13 +234,13 @@ exports.getAllProducts = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      const products = result.rows;
+      const dataList = result.rows;
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
         success: true,
         data: {
-          products,
+          dataList,
           totalCount,
           page: pageNum,
           limit: limitNum,
@@ -289,7 +294,12 @@ exports.getProductById = async (req, res) => {
         return res.status(404).json({ error: 'Product not found' });
       }
 
-      res.status(200).json(result.rows[0]);
+      // res.status(200).json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product fetch successfully'
+      });
     } finally {
       client.release();
     }
@@ -322,7 +332,12 @@ exports.updateProduct = async (req, res) => {
         ]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: 'Product not found' });
-      res.status(200).json(result.rows[0]);
+      // res.status(200).json(result.rows[0]);
+       res.status(201).json({
+        status: true,
+        data: result.rows[0],
+        message: 'Product update successfully'
+      });
     } finally {
       client.release();
     }
