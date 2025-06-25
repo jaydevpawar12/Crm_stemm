@@ -110,6 +110,7 @@ exports.getAllLeads = async (req, res) => {
         status,
         stage,
         companyId,
+        search,
         page = 1,
         limit = 10
       } = req.query;
@@ -128,6 +129,11 @@ exports.getAllLeads = async (req, res) => {
       // Validate companyId
       if (companyId && !companyId.trim()) {
         return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+      }
+
+      // Validate search parameter
+      if (search && typeof search !== 'string') {
+        return res.status(400).json({ error: 'Invalid search parameter: Must be a string' });
       }
 
       // Validate pagination inputs
@@ -188,6 +194,11 @@ exports.getAllLeads = async (req, res) => {
         values.push(companyId);
         paramIndex++;
       }
+      if (search) {
+        query += ` AND LOWER(leads.name) LIKE LOWER($${paramIndex})`;
+        values.push(`%${search.trim()}%`);
+        paramIndex++;
+      }
 
       // Add pagination
       query += ` ORDER BY leads.createdAt DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
@@ -228,6 +239,11 @@ exports.getAllLeads = async (req, res) => {
         countValues.push(companyId);
         countIndex++;
       }
+      if (search) {
+        countQuery += ` AND LOWER(name) LIKE LOWER($${countIndex})`;
+        countValues.push(`%${search.trim()}%`);
+        countIndex++;
+      }
 
       // Execute both queries
       const [dataResult, countResult] = await Promise.all([
@@ -240,7 +256,7 @@ exports.getAllLeads = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: {dataList:dataResult.rows},
+        data: { dataList: dataResult.rows },
         page: pageNum,
         limit: limitNum,
         totalCount,

@@ -5,65 +5,64 @@ const { validate: isUUID } = require('uuid');
 // Create Customer
 exports.createCustomer = async (req, res) => {
   const {
-    // Added to match user API's ID requirement
-    name, email, phone, address, website, created_by,
-    companyname, locationaddress, location_lat, location_long,
-    locationname, customercode, assigntoid, imageurl
+    name, email, phone, address, website, createdBy,
+    companyId, locationAddress, locationLat, locationLong,
+    locationName, customerCode, assignedToId, imageUrl
   } = req.body;
 
   // Validate required fields
   if (!name) return res.status(400).json({ error: 'Name is required' });
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-  if (!created_by) return res.status(400).json({ error: 'Created_by is required' });
+  if (!createdBy) return res.status(400).json({ error: 'CreatedBy is required' });
 
   // Validate UUID fields
-  if (!isUUID(created_by)) return res.status(400).json({ error: 'Invalid created_by: Must be a valid UUID' });
-  if (assigntoid && !isUUID(assigntoid)) return res.status(400).json({ error: 'Invalid assigntoid: Must be a valid UUID' });
+  if (!isUUID(createdBy)) return res.status(400).json({ error: 'Invalid createdBy: Must be a valid UUID' });
+  if (assignedToId && !isUUID(assignedToId)) return res.status(400).json({ error: 'Invalid assignedToId: Must be a valid UUID' });
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+  // Validate email format if provided
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+  }
 
   // Validate other fields
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
   if (website && !/^https?:\/\/[^\s$.?#].[^\s]*$/.test(website)) return res.status(400).json({ error: 'Invalid website URL' });
-  if (location_lat && (isNaN(location_lat) || location_lat < -90 || location_lat > 90)) return res.status(400).json({ error: 'Invalid latitude: Must be between -90 and 90' });
-  if (location_long && (isNaN(location_long) || location_long < -180 || location_long > 180)) return res.status(400).json({ error: 'Invalid longitude: Must be between -180 and 180' });
-  if (customercode && !/^[A-Z0-9]{3,10}$/.test(customercode)) return res.status(400).json({ error: 'Invalid customer code: Must be 3-10 alphanumeric characters' });
+  if (locationLat && (isNaN(locationLat) || locationLat < -90 || locationLat > 90)) return res.status(400).json({ error: 'Invalid latitude: Must be between -90 and 90' });
+  if (locationLong && (isNaN(locationLong) || locationLong < -180 || locationLong > 180)) return res.status(400).json({ error: 'Invalid longitude: Must be between -180 and 180' });
+  if (customerCode && !/^[A-Z0-9]{3,10}$/.test(customerCode)) return res.status(400).json({ error: 'Invalid customer code: Must be 3-10 alphanumeric characters' });
 
   try {
     const client = await pool.connect();
     try {
-      // Validate created_by exists in users table
-      console.log('created_by:', created_by);
-      const creatorCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [created_by]);
+      // Validate createdBy exists in users table
+      const creatorCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [createdBy]);
       if (creatorCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid created_by: User does not exist' });
+        return res.status(400).json({ error: 'Invalid createdBy: User does not exist' });
       }
 
-      // Validate assigntoid exists in users table
-      if (assigntoid) {
-        const assigneeCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assigntoid]);
+      // Validate assignedToId exists in users table
+      if (assignedToId) {
+        const assigneeCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assignedToId]);
         if (assigneeCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid assigntoid: User does not exist' });
+          return res.status(400).json({ error: 'Invalid assignedToId: User does not exist' });
         }
       }
 
       const result = await client.query(
         `INSERT INTO customers (
-           name, email, phone, address, website, created_by,
-          companyname, locationaddress, location_lat, location_long,
-          locationname, customercode, assigntoid, imageurl
+           name, email, phone, address, website, createdBy,
+           companyId, locationAddress, locationLat, locationLong,
+           locationName, customerCode, assignedToId, imageUrl
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
         RETURNING *`,
-        [ name, email, phone, address, website, created_by,
-         companyname, locationaddress, location_lat, location_long,
-         locationname, customercode, assigntoid, imageurl]
+        [name, email, phone, address, website, createdBy,
+         companyId, locationAddress, locationLat, locationLong,
+         locationName, customerCode, assignedToId, imageUrl]
       );
 
       res.status(201).json({
         success: true,
-        data:result.rows[0] ,
+        data: result.rows[0],
         message: 'Customer created successfully'
       });
     } catch (err) {
@@ -72,7 +71,7 @@ exports.createCustomer = async (req, res) => {
         return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
       }
       if (err.code === '23505') {
-        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation (e.g., duplicate email or id)' });
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
       }
       if (err.code === '22P02') {
         return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
@@ -92,7 +91,7 @@ exports.getCustomers = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const { assigntoid, created_by, page = 1, limit = 10 ,search} = req.query;
+      const { assignedToId, createdBy, companyId, page = 1, limit = 10, search } = req.query;
 
       // Validate page and limit
       const pageNum = parseInt(page, 10);
@@ -105,52 +104,73 @@ exports.getCustomers = async (req, res) => {
       }
 
       // Validate UUID fields
-      if (assigntoid && !isUUID(assigntoid)) {
-        return res.status(400).json({ error: 'Invalid assigntoid: Must be a valid UUID' });
+      if (assignedToId && !isUUID(assignedToId)) {
+        return res.status(400).json({ error: 'Invalid assignedToId: Must be a valid UUID' });
       }
-      if (created_by && !isUUID(created_by)) {
-        return res.status(400).json({ error: 'Invalid created_by: Must be a valid UUID' });
+      if (createdBy && !isUUID(createdBy)) {
+        return res.status(400).json({ error: 'Invalid createdBy: Must be a valid UUID' });
       }
 
-      // Validate assigntoid exists
-      if (assigntoid) {
-        const assigneeCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assigntoid]);
+      // Validate search parameter
+      if (search && typeof search !== 'string') {
+        return res.status(400).json({ error: 'Invalid search parameter: Must be a string' });
+      }
+
+      // Validate companyId if provided
+      if (companyId && typeof companyId !== 'string') {
+        return res.status(400).json({ error: 'Invalid companyId: Must be a string' });
+      }
+
+      // Validate assignedToId exists
+      if (assignedToId) {
+        const assigneeCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assignedToId]);
         if (assigneeCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid assigntoid: User does not exist' });
+          return res.status(400).json({ error: 'Invalid assignedToId: User does not exist' });
         }
       }
 
-      // Validate created_by exists
-      if (created_by) {
-        const creatorCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [created_by]);
+      // Validate createdBy exists
+      if (createdBy) {
+        const creatorCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [createdBy]);
         if (creatorCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid created_by: User does not exist' });
+          return res.status(400).json({ error: 'Invalid createdBy: User does not exist' });
         }
       }
 
       const offset = (pageNum - 1) * limitNum;
 
+      // Main query
       let query = `
         SELECT 
           c.*,
           u1.name AS assigned_to_name,
           u2.name AS created_by_name
         FROM customers c
-        LEFT JOIN users u1 ON c.assigntoid = u1.id
-        LEFT JOIN users u2 ON c.created_by = u2.id
+        LEFT JOIN users u1 ON c.assignedToId = u1.id
+        LEFT JOIN users u2 ON c.createdBy = u2.id
       `;
       let conditions = [];
       let values = [];
       let paramCount = 1;
 
-      if (assigntoid) {
-        conditions.push(`c.assigntoid = $${paramCount}::uuid`);
-        values.push(assigntoid);
+      if (assignedToId) {
+        conditions.push(`c.assignedToId = $${paramCount}::uuid`);
+        values.push(assignedToId);
         paramCount++;
       }
-      if (created_by) {
-        conditions.push(`c.created_by = $${paramCount}::uuid`);
-        values.push(created_by);
+      if (createdBy) {
+        conditions.push(`c.createdBy = $${paramCount}::uuid`);
+        values.push(createdBy);
+        paramCount++;
+      }
+      if (companyId) {
+        conditions.push(`c.companyId = $${paramCount}`);
+        values.push(companyId);
+        paramCount++;
+      }
+      if (search) {
+        conditions.push(`LOWER(c.name) LIKE LOWER($${paramCount})`);
+        values.push(`%${search.trim()}%`);
         paramCount++;
       }
 
@@ -158,23 +178,45 @@ exports.getCustomers = async (req, res) => {
         query += ' WHERE ' + conditions.join(' AND ');
       }
 
-      query += ` ORDER BY c.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+      query += ` ORDER BY c.createdAt DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
       values.push(limitNum, offset);
 
+      // Count query
       let countQuery = `SELECT COUNT(*) FROM customers c`;
+      const countConditions = [];
       const countParams = [];
       let countParamIndex = 1;
 
-      if (assigntoid) {
-        countQuery += ` WHERE c.assigntoid = $${countParamIndex}::uuid`;
-        countParams.push(assigntoid);
+      if (assignedToId) {
+        countConditions.push(`c.assignedToId = $${countParamIndex}::uuid`);
+        countParams.push(assignedToId);
         countParamIndex++;
       }
-      if (created_by) {
-        countQuery += countParams.length > 0 ? ` AND c.created_by = $${countParamIndex}::uuid` : ` WHERE c.created_by = $${countParamIndex}::uuid`;
-        countParams.push(created_by);
+      if (createdBy) {
+        countConditions.push(`c.createdBy = $${countParamIndex}::uuid`);
+        countParams.push(createdBy);
         countParamIndex++;
       }
+      if (companyId) {
+        countConditions.push(`c.companyId = $${countParamIndex}`);
+        countParams.push(companyId);
+        countParamIndex++;
+      }
+      if (search) {
+        countConditions.push(`LOWER(c.name) LIKE LOWER($${countParamIndex})`);
+        countParams.push(`%${search.trim()}%`);
+        countParamIndex++;
+      }
+
+      if (countConditions.length > 0) {
+        countQuery += ' WHERE ' + countConditions.join(' AND ');
+      }
+
+      // Debugging logs
+      console.log('Main Query:', query);
+      console.log('Main Query Params:', values);
+      console.log('Count Query:', countQuery);
+      console.log('Count Query Params:', countParams);
 
       const [result, countResult] = await Promise.all([
         client.query(query, values),
@@ -185,7 +227,7 @@ exports.getCustomers = async (req, res) => {
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
-        success: true,
+        status: true,
         data: {
           dataList,
           totalCount,
@@ -227,8 +269,8 @@ exports.getCustomerById = async (req, res) => {
           u1.name AS assigned_to_name,
           u2.name AS created_by_name
         FROM customers c
-        LEFT JOIN users u1 ON c.assigntoid = u1.id
-        LEFT JOIN users u2 ON c.created_by = u2.id
+        LEFT JOIN users u1 ON c.assignedToId = u1.id
+        LEFT JOIN users u2 ON c.createdBy = u2.id
         WHERE c.id = $1
         `,
         [id]
@@ -236,7 +278,7 @@ exports.getCustomerById = async (req, res) => {
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
         success: true,
-        data: result.rows[0] ,
+        data: result.rows[0],
         message: 'Customer fetched successfully'
       });
     } catch (err) {
@@ -258,64 +300,65 @@ exports.getCustomerById = async (req, res) => {
 exports.updateCustomer = async (req, res) => {
   const { id } = req.params;
   const {
-    name, email, phone, address, website, created_by,
-    companyname, locationaddress, location_lat, location_long,
-    locationname, customercode, assigntoid, imageurl
+    name, email, phone, address, website, createdBy,
+    companyId, locationAddress, locationLat, locationLong,
+    locationName, customerCode, assignedToId, imageUrl
   } = req.body;
 
   // Validate required fields
   if (!id) return res.status(400).json({ error: 'Customer ID is required' });
   if (!name) return res.status(400).json({ error: 'Name is required' });
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-  if (!created_by) return res.status(400).json({ error: 'Created_by is required' });
+  if (!createdBy) return res.status(400).json({ error: 'CreatedBy is required' });
 
   // Validate UUID fields
   if (!isUUID(id)) return res.status(400).json({ error: 'Invalid customer ID: Must be a valid UUID' });
-  if (!isUUID(created_by)) return res.status(400).json({ error: 'Invalid created_by: Must be a valid UUID' });
-  if (assigntoid && !isUUID(assigntoid)) return res.status(400).json({ error: 'Invalid assigntoid: Must be a valid UUID' });
+  if (!isUUID(createdBy)) return res.status(400).json({ error: 'Invalid createdBy: Must be a valid UUID' });
+  if (assignedToId && !isUUID(assignedToId)) return res.status(400).json({ error: 'Invalid assignedToId: Must be a valid UUID' });
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+  // Validate email format if provided
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+  }
 
   // Validate other fields
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
   if (website && !/^https?:\/\/[^\s$.?#].[^\s]*$/.test(website)) return res.status(400).json({ error: 'Invalid website URL' });
-  if (location_lat && (isNaN(location_lat) || location_lat < -90 || location_lat > 90)) return res.status(400).json({ error: 'Invalid latitude: Must be between -90 and 90' });
-  if (location_long && (isNaN(location_long) || location_long < -180 || location_long > 180)) return res.status(400).json({ error: 'Invalid longitude: Must be between -180 and 180' });
-  if (customercode && !/^[A-Z0-9]{3,10}$/.test(customercode)) return res.status(400).json({ error: 'Invalid customer code: Must be 3-10 alphanumeric characters' });
+  if (locationLat && (isNaN(locationLat) || locationLat < -90 || locationLat > 90)) return res.status(400).json({ error: 'Invalid latitude: Must be between -90 and 90' });
+  if (locationLong && (isNaN(locationLong) || locationLong < -180 || locationLong > 180)) return res.status(400).json({ error: 'Invalid longitude: Must be between -180 and 180' });
+  if (customerCode && !/^[A-Z0-9]{3,10}$/.test(customerCode)) return res.status(400).json({ error: 'Invalid customer code: Must be 3-10 alphanumeric characters' });
 
   try {
     const client = await pool.connect();
     try {
-      // Validate created_by exists
-      const creatorCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [created_by]);
+      // Validate createdBy exists
+      const creatorCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [createdBy]);
       if (creatorCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid created_by: User does not exist' });
+        return res.status(400).json({ error: 'Invalid createdBy: User does not exist' });
       }
 
-      // Validate assigntoid exists
-      if (assigntoid) {
-        const assigneeCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assigntoid]);
+      // Validate assignedToId exists
+      if (assignedToId) {
+        const assigneeCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assignedToId]);
         if (assigneeCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid assigntoid: User does not exist' });
+          return res.status(400).json({ error: 'Invalid assignedToId: User does not exist' });
         }
       }
 
       const result = await client.query(
         `UPDATE customers SET
-          name=$1, email=$2, phone=$3, address=$4, website=$5, created_by=$6,
-          companyname=$7, locationaddress=$8, location_lat=$9, location_long=$10,
-          locationname=$11, customercode=$12, assigntoid=$13, imageurl=$14
+          name=$1, email=$2, phone=$3, address=$4, website=$5, createdBy=$6,
+          companyId=$7, locationAddress=$8, locationLat=$9, locationLong=$10,
+          locationName=$11, customerCode=$12, assignedToId=$13, imageUrl=$14
         WHERE id = $15 RETURNING *`,
-        [name, email, phone, address, website, created_by,
-         companyname, locationaddress, location_lat, location_long,
-         locationname, customercode, assigntoid, imageurl, id]
+        [name, email, phone, address, website, createdBy,
+         companyId, locationAddress, locationLat, locationLong,
+         locationName, customerCode, assignedToId, imageUrl, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
         success: true,
-        data: result.rows[0] ,
+        data: result.rows[0],
         message: 'Customer updated successfully'
       });
     } catch (err) {
@@ -324,7 +367,7 @@ exports.updateCustomer = async (req, res) => {
         return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
       }
       if (err.code === '23505') {
-        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation (e.g., duplicate email)' });
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
       }
       if (err.code === '22P02') {
         return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });

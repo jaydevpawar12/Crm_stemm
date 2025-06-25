@@ -2,28 +2,6 @@
   const { pool } = require('../db');
 
 
-// CREATE
-// exports.createProductCatalogue = async (req, res) => {
-//   const { createdById, link, image, catalogueName } = req.body;
-//   try {
-//     const pool = await initializePool();
-//     const client = await pool.connect();
-//     try {
-//       const result = await client.query(
-//         `INSERT INTO productcatalogues (createdById, link, image, catalogueName)
-//          VALUES ($1, $2, $3, $4) RETURNING *`,
-//         [createdById, link, image, catalogueName]
-//       );
-//       res.status(201).json(result.rows[0]);
-//     } finally {
-//       client.release();
-//     }
-//   } catch (err) {
-//     console.error('Create product catalogue error:', err);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// };
-
 const validator = require('validator');
 const xss = require('xss');
 
