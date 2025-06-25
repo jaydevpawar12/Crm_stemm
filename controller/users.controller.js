@@ -227,6 +227,12 @@ exports.getAllUsers = async (req, res) => {
         countParams.push(companyid);
         countParamIndex++;
       }
+       // Add search filter for name if provided
+      if (search) {
+        query += ` AND LOWER(u1.name) LIKE LOWER($${paramIndex}) `;
+        queryParams.push(`%${search.trim()}%`);
+        paramIndex++;
+      }
 
       // Execute queries
       const [result, countResult] = await Promise.all([
