@@ -1,7 +1,6 @@
 // const { initializePool } = require('../db');
 const { pool } = require('../db');
 
-
 exports.createSendEmail = async (req, res) => {
   const { name, customerId, createdById, subject, htmlContent, from, to, ccRecipients, bccRecipients, attachmentUrls } = req.body;
 

@@ -61,7 +61,7 @@ exports.createUser = async (req, res) => {
 
       // Validate departmentid exists in departments table
       if (departmentid) {
-        const deptCheck = await client.query('SELECT 1 FROM departments WHERE id = $1', [departmentid]);
+        const deptCheck = await client.query('SELECT 1 FROM department WHERE id = $1', [departmentid]);
         if (deptCheck.rows.length === 0) {
           return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
         }
@@ -122,7 +122,7 @@ exports.getAllUsers = async (req, res) => {
     const client = await pool.connect();
     try {
       // Extract query parameters
-      const { reportingmanagerid, departmentid, companyid, page = 1, limit = 10 } = req.query;
+      const { reportingmanagerid, departmentid, companyid, page = 1, limit = 10 ,search} = req.query;
 
       // UUID validation regex
       const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -140,6 +140,11 @@ exports.getAllUsers = async (req, res) => {
       // Validate companyid format (string, non-empty)
       if (companyid && !companyid.trim()) {
         return res.status(400).json({ error: 'Invalid companyid: Must be a non-empty string' });
+      }
+
+       // Validate search parameter (optional, string)
+      if (search && typeof search !== 'string') {
+        return res.status(400).json({ error: 'Invalid search parameter: Must be a string' });
       }
 
       // Convert page and limit to integers and ensure they are positive
@@ -414,7 +419,7 @@ exports.getUserByEmailOrPhone = async (req, res) => {
   }
 };
 
-  exports.updateUser  = async (req, res) => {
+exports.updateUser  = async (req, res) => {
     const { id } = req.params;
     const fields = Object.entries(req.body);
 
@@ -516,8 +521,7 @@ exports.getUserByEmailOrPhone = async (req, res) => {
       }
       res.status(500).json({ error: 'Internal Server Error',details:err.message });
     }
-  };
-
+};
 
 exports.patchUser = async (req, res) => {
   const { id } = req.params;

@@ -1,4 +1,4 @@
-        const { pool } = require('../db');
+const { pool } = require('../db');
 
 // Create Subcategory
 exports.createSubcategory = async (req, res) => {
