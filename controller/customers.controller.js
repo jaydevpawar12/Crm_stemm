@@ -92,7 +92,7 @@ exports.getCustomers = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const { assigntoid, created_by, page = 1, limit = 10 } = req.query;
+      const { assigntoid, created_by, page = 1, limit = 10 ,search} = req.query;
 
       // Validate page and limit
       const pageNum = parseInt(page, 10);

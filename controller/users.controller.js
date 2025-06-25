@@ -122,7 +122,7 @@ exports.getAllUsers = async (req, res) => {
     const client = await pool.connect();
     try {
       // Extract query parameters
-      const { reportingmanagerid, departmentid, companyid, page = 1, limit = 10 ,search} = req.query;
+      const { reportingmanagerid, departmentid, companyId, page = 1, limit = 10 ,search} = req.query;
 
       // UUID validation regex
       const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -138,7 +138,7 @@ exports.getAllUsers = async (req, res) => {
       }
 
       // Validate companyid format (string, non-empty)
-      if (companyid && !companyid.trim()) {
+      if (companyId && !companyId.trim()) {
         return res.status(400).json({ error: 'Invalid companyid: Must be a non-empty string' });
       }
 
@@ -193,9 +193,16 @@ exports.getAllUsers = async (req, res) => {
       }
 
       // Add filter for companyid if provided
-      if (companyid) {
+      if (companyId) {
         query += ` AND u1.companyid = $${paramIndex} `;
-        queryParams.push(companyid);
+        queryParams.push(companyId);
+        paramIndex++;
+      }
+
+       // Add search filter for name if provided
+      if (search) {
+        query += ` AND LOWER(u1.name) LIKE LOWER($${paramIndex}) `;
+        queryParams.push(`%${search.trim()}%`);
         paramIndex++;
       }
 
@@ -222,16 +229,16 @@ exports.getAllUsers = async (req, res) => {
         countParams.push(departmentid);
         countParamIndex++;
       }
-      if (companyid) {
+      if (companyId) {
         countQuery += ` AND u1.companyid = $${countParamIndex} `;
-        countParams.push(companyid);
+        countParams.push(companyId);
         countParamIndex++;
       }
-       // Add search filter for name if provided
+      
       if (search) {
-        query += ` AND LOWER(u1.name) LIKE LOWER($${paramIndex}) `;
-        queryParams.push(`%${search.trim()}%`);
-        paramIndex++;
+        countQuery += ` AND LOWER(u1.name) LIKE LOWER($${countParamIndex}) `;
+        countParams.push(`%${search.trim()}%`);
+        countParamIndex++;
       }
 
       // Execute queries

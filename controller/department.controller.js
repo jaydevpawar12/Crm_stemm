@@ -68,6 +68,107 @@ exports.createDepartment = async (req, res) => {
   }
 };
 
+// exports.getAllDepartments = async (req, res) => {
+//   try {
+//     const client = await pool.connect();
+//     try {
+//       // Extract query parameters
+//       const { companyId, page = 1, limit = 10 } = req.query;
+
+//       // Validate companyId as a non-empty string if provided
+//       if (companyId && !companyId.trim()) {
+//         return res.status(400).json({ status: false, error: 'Invalid companyId: Must be a non-empty string' });
+//       }
+
+//       // Convert page and limit to integers and ensure they are positive
+//       const pageNum = parseInt(page, 10);
+//       const limitNum = parseInt(limit, 10);
+//       if (isNaN(pageNum) || pageNum < 1) {
+//         return res.status(400).json({ status: false, error: 'Invalid page number: Must be a positive integer' });
+//       }
+//       if (isNaN(limitNum) || limitNum < 1) {
+//         return res.status(400).json({ status: false, error: 'Invalid limit: Must be a positive integer' });
+//       }
+
+//       // Calculate offset for pagination
+//       const offset = (pageNum - 1) * limitNum;
+
+//       // Base query for fetching departments
+//       let query = `
+//         SELECT 
+//           d.*,
+//           u.name AS created_by_name
+//         FROM department d
+//         LEFT JOIN users u ON d.createById = u.id
+//         WHERE 1=1
+//       `;
+
+//       // Array to hold query parameters
+//       const queryParams = [];
+//       let paramIndex = 1;
+
+//       // Add filter for companyId if provided
+//       if (companyId) {
+//         query += ` AND TRIM(LOWER(d.companyId)) = TRIM(LOWER($${paramIndex})) `;
+//         queryParams.push(companyId.trim());
+//         paramIndex++;
+//       }
+
+//       // Add pagination
+//       query += ` ORDER BY d.id LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+//       queryParams.push(limitNum, offset);
+
+//       // Query to get total count
+//       let countQuery = `
+//         SELECT COUNT(*) 
+//         FROM department d
+//         WHERE 1=1
+//       `;
+//       const countParams = [];
+//       let countParamIndex = 1;
+
+//       if (companyId) {
+//         countQuery += ` AND TRIM(LOWER(d.companyId)) = TRIM(LOWER($${countParamIndex})) `;
+//         countParams.push(companyId.trim());
+//         countParamIndex++;
+//       }
+
+//       // Log queries for debugging
+//       console.log('Query:', query);
+//       console.log('Query Params:', queryParams);
+//       console.log('Count Query:', countQuery);
+//       console.log('Count Params:', countParams);
+
+//       // Execute queries
+//       const [result, countResult] = await Promise.all([
+//         client.query(query, queryParams),
+//         client.query(countQuery, countParams)
+//       ]);
+
+//       const dataList = result.rows;
+//       const totalCount = parseInt(countResult.rows[0].count, 10);
+
+//       res.status(200).json({
+//         status: true,
+//         data: {
+//           dataList,
+//           totalCount,
+//           page: pageNum,
+//           limit: limitNum,
+//           totalPages: Math.ceil(totalCount / limitNum)
+//         },
+//         message: 'Fetched successfully'
+//       });
+//     } finally {
+//       client.release();
+//     }
+//   } catch (err) {
+//     console.error('Get All Departments Error:', err.stack);
+//     res.status(500).json({ status: false, error: 'Internal Server Error', details: err.message });
+//   }
+// };
+
+// Get Department By ID
 
 exports.getAllDepartments = async (req, res) => {
   try {
@@ -110,7 +211,7 @@ exports.getAllDepartments = async (req, res) => {
 
       // Add filter for companyId if provided
       if (companyId) {
-        query += ` AND TRIM(LOWER(d.companyId)) = TRIM(LOWER($${paramIndex})) `;
+        query += ` AND LOWER(d.companyId) = LOWER($${paramIndex}) `;
         queryParams.push(companyId.trim());
         paramIndex++;
       }
@@ -129,12 +230,13 @@ exports.getAllDepartments = async (req, res) => {
       let countParamIndex = 1;
 
       if (companyId) {
-        countQuery += ` AND TRIM(LOWER(d.companyId)) = TRIM(LOWER($${countParamIndex})) `;
+        countQuery += ` AND LOWER(d.companyId) = LOWER($${countParamIndex}) `;
         countParams.push(companyId.trim());
         countParamIndex++;
       }
 
       // Log queries for debugging
+      console.log('Input companyId:', companyId || 'No companyId provided');
       console.log('Query:', query);
       console.log('Query Params:', queryParams);
       console.log('Count Query:', countQuery);
@@ -149,6 +251,22 @@ exports.getAllDepartments = async (req, res) => {
       const dataList = result.rows;
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
+      // If no data found with companyId, return empty result with specific message
+      if (companyId && dataList.length === 0) {
+        console.warn(`No departments found for companyId: ${companyId.trim()}`);
+        return res.status(200).json({
+          status: true,
+          data: {
+            dataList: [],
+            totalCount: 0,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: 0
+          },
+          message: `No departments found for companyId: ${companyId.trim()}`
+        });
+      }
+      
       res.status(200).json({
         status: true,
         data: {
@@ -169,7 +287,6 @@ exports.getAllDepartments = async (req, res) => {
   }
 };
 
-// Get Department By ID
 exports.getDepartmentById = async (req, res) => {
   const { id } = req.params;
 
