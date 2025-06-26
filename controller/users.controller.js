@@ -33,6 +33,7 @@ exports.createUser = async (req, res) => {
   if (dialcode && !/^\+\d{1,4}$/.test(dialcode)) return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
 
   try {
+    // const pool = await initializePool();
     const client = await pool.connect();
     try {
       // Validate reportingmanagerid

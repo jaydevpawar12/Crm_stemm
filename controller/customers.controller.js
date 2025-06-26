@@ -7,7 +7,7 @@ exports.createCustomer = async (req, res) => {
   const {
     name, email, phone, address, website, createdBy,
     companyId, locationAddress, locationLat, locationLong,
-    locationName, customerCode, assignedToId, imageUrl
+    locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName
   } = req.body;
 
   // Validate required fields
@@ -26,10 +26,8 @@ exports.createCustomer = async (req, res) => {
 
   // Validate other fields
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
-  if (website && !/^https?:\/\/[^\s$.?#].[^\s]*$/.test(website)) return res.status(400).json({ error: 'Invalid website URL' });
   if (locationLat && (isNaN(locationLat) || locationLat < -90 || locationLat > 90)) return res.status(400).json({ error: 'Invalid latitude: Must be between -90 and 90' });
   if (locationLong && (isNaN(locationLong) || locationLong < -180 || locationLong > 180)) return res.status(400).json({ error: 'Invalid longitude: Must be between -180 and 180' });
-  if (customerCode && !/^[A-Z0-9]{3,10}$/.test(customerCode)) return res.status(400).json({ error: 'Invalid customer code: Must be 3-10 alphanumeric characters' });
 
   try {
     const client = await pool.connect();
@@ -48,16 +46,34 @@ exports.createCustomer = async (req, res) => {
         }
       }
 
+      // Check for existing email if provided
+      if (email) {
+        const emailCheck = await client.query('SELECT 1 FROM customers WHERE email = $1', [email]);
+        if (emailCheck.rows.length > 0) {
+          return res.status(400).json({ error: 'Email already exists' });
+        }
+      }
+
+      // Check for existing phone if provided
+      if (phone) {
+        const phoneCheck = await client.query('SELECT 1 FROM customers WHERE phone = $1', [phone]);
+        if (phoneCheck.rows.length > 0) {
+          return res.status(400).json({ error: 'Phone number already exists' });
+        }
+      }
+
       const result = await client.query(
         `INSERT INTO customers (
            name, email, phone, address, website, createdBy,
            companyId, locationAddress, locationLat, locationLong,
-           locationName, customerCode, assignedToId, imageUrl
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         RETURNING *`,
-        [name, email, phone, address, website, createdBy,
-         companyId, locationAddress, locationLat, locationLong,
-         locationName, customerCode, assignedToId, imageUrl]
+        [
+          name, email, phone, address, website, createdBy,
+          companyId, locationAddress, locationLat, locationLong,
+          locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName
+        ]
       );
 
       res.status(201).json({
@@ -169,7 +185,7 @@ exports.getCustomers = async (req, res) => {
         paramCount++;
       }
       if (search) {
-        conditions.push(`LOWER(c.name) LIKE LOWER($${paramCount})`);
+        conditions.push(`(LOWER(c.name) LIKE LOWER($${paramCount}) OR LOWER(c.companyName) LIKE LOWER($${paramCount}))`);
         values.push(`%${search.trim()}%`);
         paramCount++;
       }
@@ -203,7 +219,7 @@ exports.getCustomers = async (req, res) => {
         countParamIndex++;
       }
       if (search) {
-        countConditions.push(`LOWER(c.name) LIKE LOWER($${countParamIndex})`);
+        countConditions.push(`(LOWER(c.name) LIKE LOWER($${countParamIndex}) OR LOWER(c.companyName) LIKE LOWER($${countParamIndex}))`);
         countParams.push(`%${search.trim()}%`);
         countParamIndex++;
       }
@@ -302,7 +318,7 @@ exports.updateCustomer = async (req, res) => {
   const {
     name, email, phone, address, website, createdBy,
     companyId, locationAddress, locationLat, locationLong,
-    locationName, customerCode, assignedToId, imageUrl
+    locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName
   } = req.body;
 
   // Validate required fields
@@ -323,10 +339,8 @@ exports.updateCustomer = async (req, res) => {
 
   // Validate other fields
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
-  if (website && !/^https?:\/\/[^\s$.?#].[^\s]*$/.test(website)) return res.status(400).json({ error: 'Invalid website URL' });
   if (locationLat && (isNaN(locationLat) || locationLat < -90 || locationLat > 90)) return res.status(400).json({ error: 'Invalid latitude: Must be between -90 and 90' });
   if (locationLong && (isNaN(locationLong) || locationLong < -180 || locationLong > 180)) return res.status(400).json({ error: 'Invalid longitude: Must be between -180 and 180' });
-  if (customerCode && !/^[A-Z0-9]{3,10}$/.test(customerCode)) return res.status(400).json({ error: 'Invalid customer code: Must be 3-10 alphanumeric characters' });
 
   try {
     const client = await pool.connect();
@@ -349,11 +363,13 @@ exports.updateCustomer = async (req, res) => {
         `UPDATE customers SET
           name=$1, email=$2, phone=$3, address=$4, website=$5, createdBy=$6,
           companyId=$7, locationAddress=$8, locationLat=$9, locationLong=$10,
-          locationName=$11, customerCode=$12, assignedToId=$13, imageUrl=$14
-        WHERE id = $15 RETURNING *`,
-        [name, email, phone, address, website, createdBy,
-         companyId, locationAddress, locationLat, locationLong,
-         locationName, customerCode, assignedToId, imageUrl, id]
+          locationName=$11, customerCode=$12, assignedToId=$13, imageUrl=$14, dialCode=$15, countryCode=$16, companyName=$17
+        WHERE id = $18 RETURNING *`,
+        [
+          name, email, phone, address, website, createdBy,
+          companyId, locationAddress, locationLat, locationLong,
+          locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName, id
+        ]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
