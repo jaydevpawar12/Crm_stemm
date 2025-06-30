@@ -77,7 +77,7 @@ exports.createCustomer = async (req, res) => {
       );
 
       res.status(201).json({
-        success: true,
+        status: true,
         data: result.rows[0],
         message: 'Customer created successfully'
       });
@@ -293,7 +293,7 @@ exports.getCustomerById = async (req, res) => {
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
-        success: true,
+        status: true,
         data: result.rows[0],
         message: 'Customer fetched successfully'
       });
@@ -373,7 +373,7 @@ exports.updateCustomer = async (req, res) => {
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
-        success: true,
+        status: true,
         data: result.rows[0],
         message: 'Customer updated successfully'
       });
@@ -411,7 +411,7 @@ exports.deleteCustomer = async (req, res) => {
       const result = await client.query('DELETE FROM customers WHERE id = $1 RETURNING *', [id]);
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
       res.status(200).json({
-        success: true,
+        status: true,
         message: 'Customer deleted successfully'
       });
     } catch (err) {
@@ -431,3 +431,4 @@ exports.deleteCustomer = async (req, res) => {
     res.status(500).json({ error: 'Failed to connect to database', details: err.message });
   }
 };
+

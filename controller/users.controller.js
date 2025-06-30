@@ -328,7 +328,7 @@ exports.getAllReportingManagers = async (req, res) => {
 
     if (managers.length === 0) {
       return res.json({
-        success: false,
+        status: false,
         data: [],
         message: "Reporting Managers not found"
       });

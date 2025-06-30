@@ -76,7 +76,7 @@ exports.createEnquiryCategory = async (req, res) => {
       );
       // const enquiryCategory=result.rows
       res.status(201).json({
-        success:true,
+        status:true,
         data:result.rows[0],
         message:"Enquiry Category Create Successfully"
       });
@@ -110,7 +110,7 @@ exports.getAllEnquiryCategories = async (req, res) => {
       `);
       // res.json(result.rows);
       res.status(201).json({
-        success:true,
+        status:true,
         data:{dataList:result.rows[0]},
         message:"Enquiry Category Fetch Successfully"
       });
@@ -151,7 +151,7 @@ exports.getEnquiryCategoryById = async (req, res) => {
       // res.json(result.rows[0]);
       // const enquiryCategory=result.rows
       res.status(201).json({
-        success:true,
+        status:true,
         data:result.rows[0],
         message:"Enquiry Category Fetch Successfully"
       });
@@ -179,7 +179,7 @@ exports.updateEnquiryCategory = async (req, res) => {
       // res.json(result.rows[0]);
       // const enquiryCategory=result.rows
       res.status(201).json({
-        success:true,
+        status:true,
         data:{dataList:result.rows[0]},
         message:"Enquiry Category Update Successfully"
       });

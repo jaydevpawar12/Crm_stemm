@@ -212,7 +212,7 @@ exports.searchForms = async (req, res) => {
         [`%${name.trim()}%`]
       );
       res.json({
-        success: true,
+        status: true,
         data: {dataList:result.rows[0]},
         message: result.rows.length > 0 ? 'Forms found' : 'No forms found matching the search criteria'
       });

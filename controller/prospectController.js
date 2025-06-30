@@ -154,7 +154,7 @@ exports.getAllProspects = async (req, res) => {
       `);
       const dataList=result.rows
       res.status(200).json({
-        success:true,
+        status:true,
         data:{
           dataList
         },

@@ -16,7 +16,7 @@ exports.createCategory = async (req, res) => {
       );
       // res.status(201).json(result.rows[0]);
       res.status(201).json({
-        success: true,
+        status: true,
         data: result.rows[0] ,
         message: 'category created successfully'
       });
@@ -37,7 +37,7 @@ exports.getAllCategories = async (req, res) => {
       const result = await client.query('SELECT * FROM category');
       // res.json(result.rows);
       res.status(201).json({
-        success: true,
+        status: true,
         data: { dataList: result.rows[0] },
         message: 'category fetch successfully'
       });
@@ -60,7 +60,7 @@ exports.getCategoryById = async (req, res) => {
       if (!result.rows.length) return res.status(404).json({ message: 'Category not found' });
       // res.json(result.rows[0]);
       res.status(201).json({
-        success: true,
+        status: true,
         data: result.rows[0] ,
         message: 'category fetch successfully'
       });
@@ -87,7 +87,7 @@ exports.updateCategory = async (req, res) => {
       if (!result.rows.length) return res.status(404).json({ message: 'Category not found' });
       // res.json(result.rows[0]);
       res.status(201).json({
-        success: true,
+        status: true,
         data: result.rows[0] ,
         message: 'category update successfully'
       });
