@@ -1,6 +1,7 @@
 const { pool } = require('../db');
 const { validate: isUUID } = require('uuid');
 
+
 exports.createUser = async (req, res) => {
   const {
     id, name, email, role_id, phone, countrycode, dialcode,
