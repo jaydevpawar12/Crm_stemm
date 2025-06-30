@@ -252,18 +252,18 @@ exports.getCustomers = async (req, res) => {
         client.query(count_query, count_params)
       ]);
 
-      const data_list = result.rows;
+      const dataList = result.rows;
 
-      const total_count = parseInt(count_result.rows[0].count, 10);
+      const totalCount = parseInt(count_result.rows[0].count, 10);
 
       res.status(200).json({
         status: true,
         data: {
-          data_list,
-          total_count,
+          dataList,
+          totalCount,
           page: page_num,
           limit: limit_num,
-          total_pages: Math.ceil(total_count / limit_num)
+          totalPages: Math.ceil(totalCount / limit_num)
         },
         message: 'Customers fetched successfully'
       });
