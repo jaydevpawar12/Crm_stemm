@@ -199,9 +199,9 @@ exports.getAllUsers = async (req, res) => {
       let query = `
         SELECT 
           u1.*,
-          u2.name AS-reportingmanagername,
-          u3.name AS crossreportingmanagername,
-          d.name AS departmentname
+          u2.name AS reporting_manager_name,
+          u3.name AS cross_reporting_manager_name,
+          d.name AS department_name
         FROM users u1
         LEFT JOIN users u2 ON u1.reportingmanagerid = u2.id
         LEFT JOIN users u3 ON u1.crossreportingmanagerid = u3.id
