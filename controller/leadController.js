@@ -100,9 +100,11 @@ exports.createLead = async (req, res) => {
         ]
       );
 
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(201).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Lead created successfully'
       });
     } catch (err) {
@@ -502,10 +504,10 @@ exports.getLeadsByCompanyId = async (req, res) => {
         `,
         [companyId]
       );
-
+      const camelCaseData = toCamelCase(result.rows[0]);
       res.status(200).json({
         status: true,
-        data: {dataList:result.rows[0]},
+        data:camelCaseData ,
         message: "Leads fetched successfully"
       });
     } finally {
@@ -548,9 +550,12 @@ exports.getLeadById = async (req, res) => {
         return res.status(404).json({ error: 'Lead not found' });
       }
 
+     const camelCaseData = toCamelCase(result.rows[0]);
+
+
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Lead fetched successfully'
       });
     } finally {
@@ -644,10 +649,11 @@ exports.updateLead = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Lead not found' });
       }
-
+      
+      const camelCaseData = toCamelCase(result.rows[0]);
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Lead updated successfully'
       });
     } finally {
@@ -729,10 +735,12 @@ exports.patchLead = async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Lead not found' });
       }
+      
+      const camelCaseData = toCamelCase(result.rows[0]);
 
         res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Lead patched successfully',
       })
       

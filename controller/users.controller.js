@@ -1,15 +1,56 @@
 const { pool } = require('../db');
 const { validate: isUUID } = require('uuid');
 
+// Utility function to convert snake_case to camelCase
+
+const toCamelCase = (obj) => {
+  const newObj = {};
+  for (let key in obj) {
+    // Convert snake_case to camelCase
+    let camelKey = key.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+    // Ensure consistent camelCase for specific fields
+    camelKey = camelKey.replace(/^([A-Z])/, (match, letter) => letter.toLowerCase()); // Ensure first letter is lowercase
+    if (camelKey === 'roleId') camelKey = 'roleId';
+    if (camelKey === 'reportingmanagerid') camelKey = 'reportingManagerId';
+    if (camelKey === 'crossreportingmanagerid') camelKey = 'crossReportingManagerId';
+    if (camelKey === 'departmentid') camelKey = 'departmentId';
+    if (camelKey === 'employeeid') camelKey = 'employeeId';
+    if (camelKey === 'employeetype') camelKey = 'employeeType';
+    if (camelKey === 'fcmtoken') camelKey = 'fcmToken';
+    if (camelKey === 'imageurl') camelKey = 'imageUrl';
+    if (camelKey === 'addharcard') camelKey = 'aadharCard';
+    if (camelKey === 'pancard') camelKey = 'panCard';
+    if (camelKey === 'otherdocument') camelKey = 'otherDocument';
+    if (camelKey === 'secretkey') camelKey = 'secretKey';
+    if (camelKey === 'isnewuser') camelKey = 'isNewUser';
+    if (camelKey === 'emailverify') camelKey = 'emailVerify';
+    if (camelKey === 'isuserdisabled') camelKey = 'isUserDisabled';
+    if (camelKey === 'webaccess') camelKey = 'webAccess';
+    if (camelKey === 'mobileaccess') camelKey = 'mobileAccess';
+    if (camelKey === 'deviceid') camelKey = 'deviceId';
+    if (camelKey === 'devicename') camelKey = 'deviceName';
+    if (camelKey === 'companyid') camelKey = 'companyId';
+    if (camelKey === 'companyname') camelKey = 'companyName';
+    if (camelKey === 'reportingmanagername') camelKey = 'reportingManagerName';
+    if (camelKey === 'crossreportingmanagername') camelKey = 'crossReportingManagerName';
+    if (camelKey === 'departmentname') camelKey = 'departmentName';
+    if (camelKey === 'roleName') camelKey = 'roleName';
+    if (camelKey === 'countrycode') camelKey = 'countryCode';
+    if (camelKey === 'dialcode') camelKey = 'dialCode';
+    newObj[camelKey] = obj[key];
+  }
+  return newObj;
+};
+
 
 exports.createUser = async (req, res) => {
   const {
-    id, name, email, role_id, phone, countrycode, dialcode,
-    employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
-    designation, reportingmanagerid, crossreportingmanagerid, addharcard,
-    pancard, otherdocument, secretkey, isnewuser = true, emailverify = false,
-    isuserdisabled = false, webaccess = true, mobileaccess = true,
-    deviceid, devicename, companyid, companyname
+    id, name, email, roleId, phone, countryCode, dialCode,
+    employeeId, employeeType, fcmToken, gender, imageUrl, departmentId,
+    designation, reportingManagerId, crossReportingManagerId, aadharCard,
+    panCard, otherDocument, secretKey, isNewUser = true, emailVerify = false,
+    isUserDisabled = false, webAccess = true, mobileAccess = true,
+    deviceId, deviceName, companyId, companyName
   } = req.body;
 
   // Validate required fields
@@ -19,10 +60,10 @@ exports.createUser = async (req, res) => {
 
   // Validate UUID fields
   if (!isUUID(id)) return res.status(400).json({ error: 'Invalid user ID: Must be a valid UUID' });
-  if (role_id && !isUUID(role_id)) return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
-  if (reportingmanagerid && !isUUID(reportingmanagerid)) return res.status(400).json({ error: 'Invalid reportingmanagerid: Must be a valid UUID' });
-  if (crossreportingmanagerid && !isUUID(crossreportingmanagerid)) return res.status(400).json({ error: 'Invalid crossreportingmanagerid: Must be a valid UUID' });
-  if (departmentid && !isUUID(departmentid)) return res.status(400).json({ error: 'Invalid departmentid: Must be a valid UUID' });
+  if (roleId && !isUUID(roleId)) return res.status(400).json({ error: 'Invalid roleId: Must be a valid UUID' });
+  if (reportingManagerId && !isUUID(reportingManagerId)) return res.status(400).json({ error: 'Invalid reportingManagerId: Must be a valid UUID' });
+  if (crossReportingManagerId && !isUUID(crossReportingManagerId)) return res.status(400).json({ error: 'Invalid crossReportingManagerId: Must be a valid UUID' });
+  if (departmentId && !isUUID(departmentId)) return res.status(400).json({ error: 'Invalid departmentId: Must be a valid UUID' });
 
   // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,42 +71,41 @@ exports.createUser = async (req, res) => {
 
   // Validate other fields
   if (phone && !/^\d{10}$/.test(phone)) return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
-  if (countrycode && !/^[A-Z]{2}$/.test(countrycode)) return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
-  if (dialcode && !/^\+\d{1,4}$/.test(dialcode)) return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
+  if (countryCode && !/^[A-Z]{2}$/.test(countryCode)) return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
+  if (dialCode && !/^\+\d{1,4}$/.test(dialCode)) return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
 
   try {
-    // const pool = await initializePool();
     const client = await pool.connect();
     try {
-      // Validate reportingmanagerid
-      if (reportingmanagerid) {
-        const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [reportingmanagerid]);
+      // Validate reportingManagerId
+      if (reportingManagerId) {
+        const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [reportingManagerId]);
         if (managerCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid reportingmanagerid: User does not exist' });
+          return res.status(400).json({ error: 'Invalid reportingManagerId: User does not exist' });
         }
       }
 
-      // Validate crossreportingmanagerid
-      if (crossreportingmanagerid) {
-        const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [crossreportingmanagerid]);
+      // Validate crossReportingManagerId
+      if (crossReportingManagerId) {
+        const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [crossReportingManagerId]);
         if (crossManagerCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid crossreportingmanagerid: User does not exist' });
+          return res.status(400).json({ error: 'Invalid crossReportingManagerId: User does not exist' });
         }
       }
 
-      // Validate role_id exists in roles table
-      if (role_id) {
-        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [role_id]);
+      // Validate roleId exists in roles table
+      if (roleId) {
+        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [roleId]);
         if (roleCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid role_id: Role does not exist' });
+          return res.status(400).json({ error: 'Invalid roleId: Role does not exist' });
         }
       }
 
-      // Validate departmentid exists in departments table
-      if (departmentid) {
-        const deptCheck = await client.query('SELECT 1 FROM department WHERE id = $1', [departmentid]);
+      // Validate departmentId exists in departments table
+      if (departmentId) {
+        const deptCheck = await client.query('SELECT 1 FROM department WHERE id = $1', [departmentId]);
         if (deptCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
+          return res.status(400).json({ error: 'Invalid departmentId: Department does not exist' });
         }
       }
 
@@ -84,18 +124,20 @@ exports.createUser = async (req, res) => {
         )
         RETURNING *`,
         [
-          id, name, email, role_id, phone, countrycode, dialcode,
-          employeeid, employeetype, fcmtoken, gender, imageurl, departmentid,
-          designation, reportingmanagerid, crossreportingmanagerid, addharcard,
-          pancard, otherdocument, secretkey, isnewuser, emailverify, isuserdisabled,
-          webaccess, mobileaccess, deviceid, devicename, companyid, companyname
+          id, name, email, roleId, phone, countryCode, dialCode,
+          employeeId, employeeType, fcmToken, gender, imageUrl, departmentId,
+          designation, reportingManagerId, crossReportingManagerId, aadharCard,
+          panCard, otherDocument, secretKey, isNewUser, emailVerify, isUserDisabled,
+          webAccess, mobileAccess, deviceId, deviceName, companyId, companyName
         ]
       );
 
-      // const users = result.rows;
+      // Convert snake_case to camelCase for the response data
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: "Fetched successfully"
       });
     } catch (err) {
@@ -124,27 +166,18 @@ exports.getAllUsers = async (req, res) => {
     const client = await pool.connect();
     try {
       // Extract query parameters
-      const { reportingmanagerid, departmentid, companyId, page = 1, limit = 10 ,search} = req.query;
+      const { reportingManagerId, departmentId, companyId, page = 1, limit = 10, search } = req.query;
 
-      // UUID validation regex
-      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-      // Validate reportingmanagerid format
-      if (reportingmanagerid && !uuidRegex.test(reportingmanagerid)) {
-        return res.status(400).json({ error: 'Invalid reportingmanagerid format: Must be a valid UUID' });
+      // Validate UUID fields
+      if (reportingManagerId && !isUUID(reportingManagerId)) {
+        return res.status(400).json({ error: 'Invalid reportingManagerId format: Must be a valid UUID' });
       }
-
-      // Validate departmentid format
-      if (departmentid && !uuidRegex.test(departmentid)) {
-        return res.status(400).json({ error: 'Invalid departmentid format: Must be a valid UUID' });
+      if (departmentId && !isUUID(departmentId)) {
+        return res.status(400).json({ error: 'Invalid departmentId format: Must be a valid UUID' });
       }
-
-      // Validate companyid format (string, non-empty)
       if (companyId && !companyId.trim()) {
-        return res.status(400).json({ error: 'Invalid companyid: Must be a non-empty string' });
+        return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
       }
-
-       // Validate search parameter (optional, string)
       if (search && typeof search !== 'string') {
         return res.status(400).json({ error: 'Invalid search parameter: Must be a string' });
       }
@@ -166,7 +199,7 @@ exports.getAllUsers = async (req, res) => {
       let query = `
         SELECT 
           u1.*,
-          u2.name AS reportingmanagername,
+          u2.name AS-reportingmanagername,
           u3.name AS crossreportingmanagername,
           d.name AS departmentname
         FROM users u1
@@ -180,28 +213,28 @@ exports.getAllUsers = async (req, res) => {
       const queryParams = [];
       let paramIndex = 1;
 
-      // Add filter for reportingmanagerid if provided
-      if (reportingmanagerid) {
+      // Add filter for reportingManagerId if provided
+      if (reportingManagerId) {
         query += ` AND u1.reportingmanagerid = $${paramIndex}::uuid `;
-        queryParams.push(reportingmanagerid);
+        queryParams.push(reportingManagerId);
         paramIndex++;
       }
 
-      // Add filter for departmentid if provided
-      if (departmentid) {
+      // Add filter for departmentId if provided
+      if (departmentId) {
         query += ` AND u1.departmentid = $${paramIndex}::uuid `;
-        queryParams.push(departmentid);
+        queryParams.push(departmentId);
         paramIndex++;
       }
 
-      // Add filter for companyid if provided
+      // Add filter for companyId if provided
       if (companyId) {
         query += ` AND u1.companyid = $${paramIndex} `;
         queryParams.push(companyId);
         paramIndex++;
       }
 
-       // Add search filter for name if provided
+      // Add search filter for name if provided
       if (search) {
         query += ` AND LOWER(u1.name) LIKE LOWER($${paramIndex}) `;
         queryParams.push(`%${search.trim()}%`);
@@ -221,14 +254,14 @@ exports.getAllUsers = async (req, res) => {
       const countParams = [];
       let countParamIndex = 1;
 
-      if (reportingmanagerid) {
+      if (reportingManagerId) {
         countQuery += ` AND u1.reportingmanagerid = $${countParamIndex}::uuid `;
-        countParams.push(reportingmanagerid);
+        countParams.push(reportingManagerId);
         countParamIndex++;
       }
-      if (departmentid) {
+      if (departmentId) {
         countQuery += ` AND u1.departmentid = $${countParamIndex}::uuid `;
-        countParams.push(departmentid);
+        countParams.push(departmentId);
         countParamIndex++;
       }
       if (companyId) {
@@ -236,7 +269,7 @@ exports.getAllUsers = async (req, res) => {
         countParams.push(companyId);
         countParamIndex++;
       }
-      
+
       if (search) {
         countQuery += ` AND LOWER(u1.name) LIKE LOWER($${countParamIndex}) `;
         countParams.push(`%${search.trim()}%`);
@@ -249,13 +282,15 @@ exports.getAllUsers = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      const dataList = result.rows;
+      // Convert snake_case to camelCase for each row
+      const camelCaseRows = result.rows.map(row => toCamelCase(row));
+
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
         status: true,
         data: {
-          dataList,
+          dataList: camelCaseRows,
           totalCount,
           page: pageNum,
           limit: limitNum,
@@ -276,11 +311,11 @@ exports.getAllUsers = async (req, res) => {
 };
 
 exports.getUsersByCompanyId = async (req, res) => {
-  const { companyid } = req.params;
+  const { companyId } = req.params;
 
-  // Validate companyid (string, non-empty)
-  if (!companyid || !companyid.trim()) {
-    return res.status(400).json({ error: 'Invalid companyid: Must be a non-empty string' });
+  // Validate companyId (string, non-empty)
+  if (!companyId || !companyId.trim()) {
+    return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
   }
 
   try {
@@ -300,13 +335,15 @@ exports.getUsersByCompanyId = async (req, res) => {
         WHERE u1.companyid = $1
         ORDER BY u1.id
         `,
-        [companyid]
+        [companyId]
       );
 
-      const dataList = result.rows;
+      // Convert snake_case to camelCase for each row
+      const camelCaseRows = result.rows.map(row => toCamelCase(row));
+
       res.status(200).json({
         status: true,
-        data: { dataList },
+        data: { dataList: camelCaseRows },
         message: "Fetched successfully"
       });
     } finally {
@@ -325,9 +362,10 @@ exports.getAllReportingManagers = async (req, res) => {
       ['Admin', 'Manager']
     );
 
-    const managers = result.rows;
+    // Convert snake_case to camelCase for each row
+    const camelCaseRows = result.rows.map(row => toCamelCase(row));
 
-    if (managers.length === 0) {
+    if (camelCaseRows.length === 0) {
       return res.json({
         status: false,
         data: [],
@@ -337,7 +375,7 @@ exports.getAllReportingManagers = async (req, res) => {
 
     return res.json({
       status: true,
-      data: managers,
+      data: camelCaseRows,
       message: "All Managers fetched successfully"
     });
   } catch (error) {
@@ -353,10 +391,13 @@ exports.getUserById = async (req, res) => {
     try {
       const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
       if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-      // const user = result.rows;
+
+      // Convert snake_case to camelCase for the response data
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: "Fetched successfully"
       });
     } finally {
@@ -416,10 +457,12 @@ exports.getUserByEmailOrPhone = async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const user = result.rows;
+      // Convert snake_case to camelCase for each row
+      const camelCaseRows = result.rows.map(row => toCamelCase(row));
+
       res.status(200).json({
         status: true,
-        data: { user },
+        data: { user: camelCaseRows },
         message: "Fetched successfully"
       });
     } catch (error) {
@@ -434,114 +477,10 @@ exports.getUserByEmailOrPhone = async (req, res) => {
   }
 };
 
-exports.updateUser  = async (req, res) => {
-    const { id } = req.params;
-    const fields = Object.entries(req.body);
-
-    // Validate that at least one field is provided
-    if (fields.length === 0) {
-      return res.status(400).json({ error: 'At least one field must be provided for update' });
-    }
-
-    // Prepare the SET clause and values for the update query
-    const setString = fields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
-    const values = fields.map(([, value]) => value);
-
-    // Validate fields if they are provided
-    if (req.body.email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(req.body.email)) {
-        return res.status(400).json({ error: 'Invalid email format' });
-      }
-    }
-    if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
-      return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
-    }
-    if (req.body.countrycode && !/^[A-Z]{2}$/.test(req.body.countrycode)) {
-      return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
-    }
-    if (req.body.dialcode && !/^\+\d{1,4}$/.test(req.body.dialcode)) {
-      return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
-    }
-  
-    if (req.body.role_id && !isUUID(req.body.role_id)) {
-      return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
-    }
-    if (req.body.reportingmanagerid && !isUUID(req.body.reportingmanagerid)) {
-      return res.status(400).json({ error: 'Invalid reportingmanagerid: Must be a valid UUID' });
-    }
-    if (req.body.crossreportingmanagerid && !isUUID(req.body.crossreportingmanagerid)) {
-      return res.status(400).json({ error: 'Invalid crossreportingmanagerid: Must be a valid UUID' });
-    }
-    if (req.body.departmentid && !isUUID(req.body.departmentid)) {
-      return res.status(400).json({ error: 'Invalid departmentid: Must be a valid UUID' });
-    }
-
-    try {
-      const client = await pool.connect();
-      try {
-        // Validate foreign keys if provided
-        if (req.body.reportingmanagerid) {
-          const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.reportingmanagerid]);
-          if (managerCheck.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid reportingmanagerid: User does not exist' });
-          }
-        }
-        if (req.body.crossreportingmanagerid) {
-          const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.crossreportingmanagerid]);
-          if (crossManagerCheck.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid crossreportingmanagerid: User does not exist' });
-          }
-        }
-        if (req.body.role_id) {
-          const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [req.body.role_id]);
-          if (roleCheck.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid role_id: Role does not exist' });
-          }
-        }
-        if (req.body.departmentid) {
-          const deptCheck = await client.query('SELECT 1 FROM department WHERE id = $1', [req.body.departmentid]);
-          if (deptCheck.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
-          }
-        }
-
-        const result = await client.query(
-          `UPDATE users SET ${setString} WHERE id = $${fields.length + 1} RETURNING *`,
-          [...values, id]
-        );
-
-        if (result.rows.length === 0) {
-          return res.status(404).json({ error: 'User  not found' });
-        }
-
-        res.status(200).json({
-          status: true,
-          data: result.rows[0],
-          message: "Updated successfully"
-        });
-      } finally {
-        client.release();
-      }
-    } catch (err) {
-      console.error('Update User Error:', err);
-      if (err.code === '23503') {
-        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
-      }
-      if (err.code === '23505') {
-        return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
-      }
-      if (err.code === '22P02') {
-        return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
-      }
-      res.status(500).json({ error: 'Internal Server Error',details:err.message });
-    }
-};
-
-exports.patchUser = async (req, res) => {
+exports.updateUser = async (req, res) => {
   const { id } = req.params;
   const fields = Object.entries(req.body);
-  
+
   // Validate that at least one field is provided
   if (fields.length === 0) {
     return res.status(400).json({ error: 'At least one field must be provided for update' });
@@ -557,52 +496,52 @@ exports.patchUser = async (req, res) => {
   if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
     return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
   }
-  if (req.body.countrycode && !/^[A-Z]{2}$/.test(req.body.countrycode)) {
+  if (req.body.countryCode && !/^[A-Z]{2}$/.test(req.body.countryCode)) {
     return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
   }
-  if (req.body.dialcode && !/^\+\d{1,4}$/.test(req.body.dialcode)) {
+  if (req.body.dialCode && !/^\+\d{1,4}$/.test(req.body.dialCode)) {
     return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
   }
- 
-  if (req.body.role_id && !isUUID(req.body.role_id)) {
-    return res.status(400).json({ error: 'Invalid role_id: Must be a valid UUID' });
+
+  if (req.body.roleId && !isUUID(req.body.roleId)) {
+    return res.status(400).json({ error: 'Invalid roleId: Must be a valid UUID' });
   }
-  if (req.body.reportingmanagerid && !isUUID(req.body.reportingmanagerid)) {
-    return res.status(400).json({ error: 'Invalid reportingmanagerid: Must be a valid UUID' });
+  if (req.body.reportingManagerId && !isUUID(req.body.reportingManagerId)) {
+    return res.status(400).json({ error: 'Invalid reportingManagerId: Must be a valid UUID' });
   }
-  if (req.body.crossreportingmanagerid && !isUUID(req.body.crossreportingmanagerid)) {
-    return res.status(400).json({ error: 'Invalid crossreportingmanagerid: Must be a valid UUID' });
+  if (req.body.crossReportingManagerId && !isUUID(req.body.crossReportingManagerId)) {
+    return res.status(400).json({ error: 'Invalid crossReportingManagerId: Must be a valid UUID' });
   }
-  if (req.body.departmentid && !isUUID(req.body.departmentid)) {
-    return res.status(400).json({ error: 'Invalid departmentid: Must be a valid UUID' });
+  if (req.body.departmentId && !isUUID(req.body.departmentId)) {
+    return res.status(400).json({ error: 'Invalid departmentId: Must be a valid UUID' });
   }
 
   try {
     const client = await pool.connect();
     try {
       // Validate foreign keys if provided
-      if (req.body.reportingmanagerid) {
-        const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.reportingmanagerid]);
+      if (req.body.reportingManagerId) {
+        const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.reportingManagerId]);
         if (managerCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid reportingmanagerid: User does not exist' });
+          return res.status(400).json({ error: 'Invalid reportingManagerId: User does not exist' });
         }
       }
-      if (req.body.crossreportingmanagerid) {
-        const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.crossreportingmanagerid]);
+      if (req.body.crossReportingManagerId) {
+        const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.crossReportingManagerId]);
         if (crossManagerCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid crossreportingmanagerid: User does not exist' });
+          return res.status(400).json({ error: 'Invalid crossReportingManagerId: User does not exist' });
         }
       }
-      if (req.body.role_id) {
-        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [req.body.role_id]);
+      if (req.body.roleId) {
+        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [req.body.roleId]);
         if (roleCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid role_id: Role does not exist' });
+          return res.status(400).json({ error: 'Invalid roleId: Role does not exist' });
         }
       }
-      if (req.body.departmentid) {
-        const deptCheck = await client.query('SELECT 1 FROM departments WHERE id = $1', [req.body.departmentid]);
+      if (req.body.departmentId) {
+        const deptCheck = await client.query('SELECT 1 FROM department WHERE id = $1', [req.body.departmentId]);
         if (deptCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid departmentid: Department does not exist' });
+          return res.status(400).json({ error: 'Invalid departmentId: Department does not exist' });
         }
       }
 
@@ -618,10 +557,118 @@ exports.patchUser = async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // const user = result.rows;
+      // Convert snake_case to camelCase for the response data
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(200).json({
         status: true,
-        data:  result.rows[0],
+        data: camelCaseData,
+        message: "Updated successfully"
+      });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Update User Error:', err);
+    if (err.code === '23503') {
+      return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+    }
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
+    }
+    if (err.code === '22P02') {
+      return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
+    }
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
+exports.patchUser = async (req, res) => {
+  const { id } = req.params;
+  const fields = Object.entries(req.body);
+
+  // Validate that at least one field is provided
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'At least one field must be provided for update' });
+  }
+
+  // Validate fields if they are provided
+  if (req.body.email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(req.body.email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+  }
+  if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  }
+  if (req.body.countryCode && !/^[A-Z]{2}$/.test(req.body.countryCode)) {
+    return res.status(400).json({ error: 'Invalid country code: Must be 2-letter ISO code' });
+  }
+  if (req.body.dialCode && !/^\+\d{1,4}$/.test(req.body.dialCode)) {
+    return res.status(400).json({ error: 'Invalid dial code: Must start with + followed by 1-4 digits' });
+  }
+
+  if (req.body.roleId && !isUUID(req.body.roleId)) {
+    return res.status(400).json({ error: 'Invalid roleId: Must be a valid UUID' });
+  }
+  if (req.body.reportingManagerId && !isUUID(req.body.reportingManagerId)) {
+    return res.status(400).json({ error: 'Invalid reportingManagerId: Must be a valid UUID' });
+  }
+  if (req.body.crossReportingManagerId && !isUUID(req.body.crossReportingManagerId)) {
+    return res.status(400).json({ error: 'Invalid crossReportingManagerId: Must be a valid UUID' });
+  }
+  if (req.body.departmentId && !isUUID(req.body.departmentId)) {
+    return res.status(400).json({ error: 'Invalid departmentId: Must be a valid UUID' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      // Validate foreign keys if provided
+      if (req.body.reportingManagerId) {
+        const managerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.reportingManagerId]);
+        if (managerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid reportingManagerId: User does not exist' });
+        }
+      }
+      if (req.body.crossReportingManagerId) {
+        const crossManagerCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.crossReportingManagerId]);
+        if (crossManagerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid crossReportingManagerId: User does not exist' });
+        }
+      }
+      if (req.body.roleId) {
+        const roleCheck = await client.query('SELECT 1 FROM roles WHERE id = $1', [req.body.roleId]);
+        if (roleCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid roleId: Role does not exist' });
+        }
+      }
+      if (req.body.departmentId) {
+        const deptCheck = await client.query('SELECT 1 FROM department WHERE id = $1', [req.body.departmentId]);
+        if (deptCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid departmentId: Department does not exist' });
+        }
+      }
+
+      const setString = fields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
+      const values = fields.map(([, value]) => value);
+
+      const result = await client.query(
+        `UPDATE users SET ${setString} WHERE id = $${fields.length + 1} RETURNING *`,
+        [...values, id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Convert snake_case to camelCase for the response data
+      const camelCaseData = toCamelCase(result.rows[0]);
+
+      res.status(200).json({
+        status: true,
+        data: camelCaseData,
         message: "Patched successfully"
       });
     } finally {
