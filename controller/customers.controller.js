@@ -218,13 +218,8 @@ exports.getCustomers = async (req, res) => {
       }
       if (search) {
         const trimmedSearch = search.trim();
-        if (trimmedSearch.length >= 3 && !trimmedSearch.includes(' ')) {
-          conditions.push(`(LOWER(c.name) = LOWER($${paramCount}) OR LOWER(c.company_name) = LOWER($${paramCount}))`);
-          values.push(trimmedSearch);
-        } else {
-          conditions.push(`(LOWER(c.name) LIKE LOWER($${paramCount}) OR LOWER(c.company_name) LIKE LOWER($${paramCount}))`);
-          values.push(`%${trimmedSearch}%`);
-        }
+        conditions.push(`(LOWER(c.name) LIKE LOWER($${paramCount}) OR LOWER(c.company_name) LIKE LOWER($${paramCount}))`);
+        values.push(`%${trimmedSearch}%`);
         paramCount++;
       }
 
@@ -258,13 +253,8 @@ exports.getCustomers = async (req, res) => {
       }
       if (search) {
         const trimmedSearch = search.trim();
-        if (trimmedSearch.length >= 3 && !trimmedSearch.includes(' ')) {
-          countConditions.push(`(LOWER(c.name) = LOWER($${countParamIndex}) OR LOWER(c.company_name) = LOWER($${countParamIndex}))`);
-          countParams.push(trimmedSearch);
-        } else {
-          countConditions.push(`(LOWER(c.name) LIKE LOWER($${countParamIndex}) OR LOWER(c.company_name) LIKE LOWER($${countParamIndex}))`);
-          countParams.push(`%${trimmedSearch}%`);
-        }
+        countConditions.push(`(LOWER(c.name) LIKE LOWER($${countParamIndex}) OR LOWER(c.company_name) LIKE LOWER($${countParamIndex}))`);
+        countParams.push(`%${trimmedSearch}%`);
         countParamIndex++;
       }
 
@@ -282,6 +272,9 @@ exports.getCustomers = async (req, res) => {
         client.query(query, values),
         client.query(countQuery, countParams)
       ]);
+
+      // Log raw results for debugging
+      console.log('Raw Results:', result.rows);
 
       // Convert snake_case to camelCase for each row
       const camelCaseRows = result.rows.map(row => toCamelCase(row));
