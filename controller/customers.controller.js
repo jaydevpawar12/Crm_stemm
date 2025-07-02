@@ -5,9 +5,7 @@ const { validate: isUUID } = require('uuid');
 const toCamelCase = (obj) => {
   const newObj = {};
   for (let key in obj) {
-    // Convert snake_case to camelCase
     let camelKey = key.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
-    // Ensure first letter is lowercase
     camelKey = camelKey.replace(/^([A-Z])/, (match, letter) => letter.toLowerCase());
     // Explicit mappings for specific fields
     if (camelKey === 'createdBy') camelKey = 'createdBy';
@@ -26,6 +24,9 @@ const toCamelCase = (obj) => {
     if (camelKey === 'createdByName') camelKey = 'createdByName';
     if (camelKey === 'secretkey') camelKey = 'secretKey';
     if (camelKey === 'isnewuser') camelKey = 'isNewUser';
+    // New fields
+    if (camelKey === 'tags') camelKey = 'tags';
+    if (camelKey === 'category') camelKey = 'category';
     newObj[camelKey] = obj[key];
   }
   return newObj;
@@ -36,7 +37,7 @@ exports.createCustomer = async (req, res) => {
   const {
     name, email, phone, address, website, createdBy,
     companyId, locationAddress, locationLat, locationLong,
-    locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName
+    locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName, tags, category
   } = req.body;
 
   // Validate required fields
@@ -46,6 +47,14 @@ exports.createCustomer = async (req, res) => {
   // Validate UUID fields
   if (!isUUID(createdBy)) return res.status(400).json({ error: 'Invalid createdBy: Must be a valid UUID' });
   if (assignedToId && !isUUID(assignedToId)) return res.status(400).json({ error: 'Invalid assignedToId: Must be a valid UUID' });
+
+  // Validate UUID arrays for tags and category
+  if (tags && (!Array.isArray(tags) || !tags.every(isUUID))) {
+    return res.status(400).json({ error: 'Invalid tags: Must be an array of valid UUIDs' });
+  }
+  if (category && (!Array.isArray(category) || !category.every(isUUID))) {
+    return res.status(400).json({ error: 'Invalid category: Must be an array of valid UUIDs' });
+  }
 
   // Validate email format if provided
   if (email) {
@@ -95,13 +104,13 @@ exports.createCustomer = async (req, res) => {
         `INSERT INTO customers (
            name, email, phone, address, website, created_by,
            company_id, location_address, location_lat, location_long,
-           location_name, customer_code, assigned_to_id, image_url, dial_code, country_code, company_name
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-        RETURNING *`,
+           location_name, customer_code, assigned_to_id, image_url, dial_code, country_code, company_name, tags, category
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+         RETURNING *`,
         [
           name, email, phone, address, website, createdBy,
           companyId, locationAddress, locationLat, locationLong,
-          locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName
+          locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName, tags, category
         ]
       );
 
@@ -273,9 +282,6 @@ exports.getCustomers = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      // Log raw results for debugging
-      console.log('Raw Results:', result.rows);
-
       // Convert snake_case to camelCase for each row
       const camelCaseRows = result.rows.map(row => toCamelCase(row));
 
@@ -361,7 +367,7 @@ exports.updateCustomer = async (req, res) => {
   const {
     name, email, phone, address, website, createdBy,
     companyId, locationAddress, locationLat, locationLong,
-    locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName
+    locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName, tags, category
   } = req.body;
 
   // Validate required fields
@@ -373,6 +379,14 @@ exports.updateCustomer = async (req, res) => {
   if (!isUUID(id)) return res.status(400).json({ error: 'Invalid customer ID: Must be a valid UUID' });
   if (!isUUID(createdBy)) return res.status(400).json({ error: 'Invalid createdBy: Must be a valid UUID' });
   if (assignedToId && !isUUID(assignedToId)) return res.status(400).json({ error: 'Invalid assignedToId: Must be a valid UUID' });
+
+  // Validate UUID arrays for tags and category
+  if (tags && (!Array.isArray(tags) || !tags.every(isUUID))) {
+    return res.status(400).json({ error: 'Invalid tags: Must be an array of valid UUIDs' });
+  }
+  if (category && (!Array.isArray(category) || !category.every(isUUID))) {
+    return res.status(400).json({ error: 'Invalid category: Must be an array of valid UUIDs' });
+  }
 
   // Validate email format if provided
   if (email) {
@@ -402,16 +416,33 @@ exports.updateCustomer = async (req, res) => {
         }
       }
 
+      // Check for existing email if provided
+      if (email) {
+        const emailCheck = await client.query('SELECT 1 FROM customers WHERE email = $1 AND id != $2', [email, id]);
+        if (emailCheck.rows.length > 0) {
+          return res.status(400).json({ error: 'Email already exists' });
+        }
+      }
+
+      // Check for existing phone if provided
+      if (phone) {
+        const phoneCheck = await client.query('SELECT 1 FROM customers WHERE phone = $1 AND id != $2', [phone, id]);
+        if (phoneCheck.rows.length > 0) {
+          return res.status(400).json({ error: 'Phone number already exists' });
+        }
+      }
+
       const result = await client.query(
         `UPDATE customers SET
-          name=$1, email=$2, phone=$3, address=$4, website=$5, created_by=$6,
-          company_id=$7, location_address=$8, location_lat=$9, location_long=$10,
-          location_name=$11, customer_code=$12, assigned_to_id=$13, image_url=$14, dial_code=$15, country_code=$16, company_name=$17
-        WHERE id = $18 RETURNING *`,
+           name=$1, email=$2, phone=$3, address=$4, website=$5, created_by=$6,
+           company_id=$7, location_address=$8, location_lat=$9, location_long=$10,
+           location_name=$11, customer_code=$12, assigned_to_id=$13, image_url=$14,
+           dial_code=$15, country_code=$16, company_name=$17, tags=$18, category=$19
+         WHERE id=$20 RETURNING *`,
         [
           name, email, phone, address, website, createdBy,
           companyId, locationAddress, locationLat, locationLong,
-          locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName, id
+          locationName, customerCode, assignedToId, imageUrl, dialCode, countryCode, companyName, tags, category, id
         ]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
@@ -433,7 +464,7 @@ exports.updateCustomer = async (req, res) => {
         return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
       }
       if (err.code === '22P02') {
-        return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for UUID or other field' });
+        return res.status(400).json({ error: 'Invalid data type', details: err.detail || 'Invalid format for americanos or other field' });
       }
       res.status(500).json({ error: 'Failed to update customer', details: err.message });
     } finally {

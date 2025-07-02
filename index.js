@@ -89,6 +89,8 @@ const formRoutes = require('./routes/formsRoutes');
 const formFieldRoutes = require('./routes/formFieldsRoutes');
 const formResponsesRoutes = require('./routes/formResponsesRoutes');
 const notes = require('./routes/notesRoutes');
+const customerCategoryroutes = require('./routes/customerCategoryRoutes');
+const customertagsroutes = require('./routes/customerTagsRoutes');
 
 
 
@@ -113,6 +115,8 @@ app.use('/api/forms', formRoutes);
 app.use('/api/formfields', formFieldRoutes);
 app.use('/api/formResponses', formResponsesRoutes);
 app.use('/api/notes', notes);
+app.use('/api/customerCategory', customerCategoryroutes);
+app.use('/api/customerTags', customertagsroutes);
 
 
 
