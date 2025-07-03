@@ -1,103 +1,122 @@
 const validator = require('validator');
 const xss = require('xss');
-// const { initializePool } = require('../db');
 const { pool } = require('../db');
-
 
 // Create Product
 exports.createProduct = async (req, res) => {
   const {
-    productCode, productName, categoryId, brand, price,
-    gstPercentage, hsnCode, productImages, createdById, companyId
+    productcode, productname, categoryid, brand, price,
+    gstpercentage, hsncode, productimages, createdbyid, companyid
   } = req.body;
 
   // Required field validation
-  if (!productCode || !productName || !createdById || !companyId) {
-    return res.status(400).json({ error: 'productCode, productName, createdById, and companyId are required' });
+  if (!productcode || !productname || !createdbyid || !companyid) {
+    return res.status(400).json({ error: 'productcode, productname, createdbyid, and companyid are required' });
   }
 
   // UUID validation
-  if (!validator.isUUID(createdById)) {
-    return res.status(400).json({ error: 'createdById must be a valid UUID' });
+  if (!validator.isUUID(createdbyid)) {
+    return res.status(400).json({ error: 'createdbyid must be a valid UUID' });
   }
-  if (categoryId && !validator.isUUID(categoryId)) {
-    return res.status(400).json({ error: 'categoryId must be a valid UUID' });
+  if (categoryid && !validator.isUUID(categoryid)) {
+    return res.status(400).json({ error: 'categoryid must be a valid UUID' });
   }
 
   // String length validation
-  if (!validator.isLength(productCode, { min: 1, max: 50 })) {
-    return res.status(400).json({ error: 'productCode must be between 1 and 50 characters' });
+  if (!validator.isLength(productcode, { min: 1, max: 50 })) {
+    return res.status(400).json({ error: 'productcode must be between 1 and 50 characters' });
   }
-  if (!validator.isLength(productName, { min: 1, max: 255 })) {
-    return res.status(400).json({ error: 'productName must be between 1 and 255 characters' });
+  if (!validator.isLength(productname, { min: 1, max: 255 })) {
+    return res.status(400).json({ error: 'productname must be between 1 and 255 characters' });
   }
   if (brand && !validator.isLength(brand, { min: 1, max: 100 })) {
     return res.status(400).json({ error: 'brand must be between 1 and 100 characters if provided' });
   }
+  if (companyid && !validator.isLength(companyid, { min: 1, max: 50 })) {
+    return res.status(400).json({ error: 'companyid must be between 1 and 50 characters' });
+  }
 
   // HSN code validation
-  if (hsnCode && !/^\d{6,8}$/.test(hsnCode)) {
-    return res.status(400).json({ error: 'hsnCode must be a 6-8 digit number if provided' });
+  if (hsncode && !/^\d{6,8}$/.test(hsncode)) {
+    return res.status(400).json({ error: 'hsncode must be a 6-8 digit number if provided' });
+  }
+
+  // Price and GST percentage validation
+  if (price && !validator.isDecimal(price.toString(), { min: 0 })) {
+    return res.status(400).json({ error: 'price must be a valid non-negative decimal number if provided' });
+  }
+  if (gstpercentage && !validator.isDecimal(gstpercentage.toString(), { min: 0, max: 100 })) {
+    return res.status(400).json({ error: 'gstpercentage must be a valid decimal number between 0 and 100 if provided' });
   }
 
   // Product images validation
-  if (productImages) {
-    if (!Array.isArray(productImages)) {
-      return res.status(400).json({ error: 'productImages must be an array' });
+  if (productimages) {
+    if (!Array.isArray(productimages)) {
+      return res.status(400).json({ error: 'productimages must be an array' });
     }
-    for (const image of productImages) {
+    for (const image of productimages) {
       if (!validator.isURL(image, { require_protocol: true })) {
-        return res.status(400).json({ error: 'Each productImages entry must be a valid URL with protocol' });
+        return res.status(400).json({ error: 'Each productimages entry must be a valid URL with protocol' });
       }
     }
   }
 
   // Sanitize inputs
-  const sanitizedProductCode = xss(productCode);
-  const sanitizedProductName = xss(productName);
-  const sanitizedBrand = brand ? xss(brand) : null;
-  const sanitizedHsnCode = hsnCode ? xss(hsnCode) : null;
-  const sanitizedProductImages = productImages ? productImages.map(img => xss(img)) : null;
-  const sanitizedPrice = price ? xss(price) : null;
-  const sanitizedGstPercentage = gstPercentage ? xss(gstPercentage) : null;
-  const sanitizedCompanyId = xss(companyId);
+  const sanitizedProductcode = xss(productcode.trim());
+  const sanitizedProductname = xss(productname.trim());
+  const sanitizedBrand = brand ? xss(brand.trim()) : null;
+  const sanitizedHsncode = hsncode ? xss(hsncode.trim()) : null;
+  const sanitizedProductimages = productimages ? productimages.map(img => xss(img.trim())) : null;
+  const sanitizedPrice = price ? xss(price.toString().trim()) : null;
+  const sanitizedGstpercentage = gstpercentage ? xss(gstpercentage.toString().trim()) : null;
+  const sanitizedCompanyid = xss(companyid.trim());
 
   try {
     const client = await pool.connect();
     try {
-      // Verify createdById exists in users table
-      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [createdById]);
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Verify createdbyid exists in users table
+      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdbyid]);
       if (userCheck.rowCount === 0) {
-        return res.status(400).json({ error: 'Invalid createdById: user does not exist' });
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid createdbyid: user does not exist' });
       }
 
-      // Verify categoryId exists if provided
-      if (categoryId) {
-        const categoryCheck = await client.query('SELECT 1 FROM product_categories WHERE id = $1', [categoryId]);
+      // Verify categoryid exists if provided
+      if (categoryid) {
+        const categoryCheck = await client.query('SELECT 1 FROM public.productcategories WHERE id = $1', [categoryid]);
         if (categoryCheck.rowCount === 0) {
-          return res.status(400).json({ error: 'Invalid categoryId: category does not exist' });
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Invalid categoryid: category does not exist' });
         }
       }
 
-      // Check for duplicate productCode for the same company
+      // Check for duplicate productcode for the same company
       const duplicateCheck = await client.query(
-        'SELECT 1 FROM products WHERE companyId = $1 AND productCode = $2',
-        [sanitizedCompanyId, sanitizedProductCode]
+        'SELECT 1 FROM public.products WHERE companyid = $1 AND productcode = $2',
+        [sanitizedCompanyid, sanitizedProductcode]
       );
       if (duplicateCheck.rowCount > 0) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Product code already exists for this company' });
       }
 
       const result = await client.query(
-        `INSERT INTO products (
-          productCode, productName, categoryId, brand, price,
-          gstPercentage, hsnCode, productImages, createdById, companyId
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        `INSERT INTO public.products (
+          productcode, productname, categoryid, brand, price,
+          gstpercentage, hsncode, productimages, createdbyid, companyid
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, productcode, productname, categoryid, brand, price,
+                  gstpercentage, hsncode, productimages, createdbyid, companyid, createdon`,
         [
-          sanitizedProductCode, sanitizedProductName, categoryId, sanitizedBrand, sanitizedPrice,
-          sanitizedGstPercentage, sanitizedHsnCode, sanitizedProductImages, createdById, sanitizedCompanyId
+          sanitizedProductcode, sanitizedProductname, categoryid, sanitizedBrand, sanitizedPrice,
+          sanitizedGstpercentage, sanitizedHsncode, sanitizedProductimages, createdbyid, sanitizedCompanyid
         ]
       );
+
+      await client.query('COMMIT');
 
       res.status(201).json({
         status: true,
@@ -105,9 +124,10 @@ exports.createProduct = async (req, res) => {
         message: 'Product created successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Create product error:', err.stack);
       if (err.code === '23503') {
-        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'createdbyid or categoryid does not exist' });
       }
       if (err.code === '23505') {
         return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
@@ -124,7 +144,7 @@ exports.createProduct = async (req, res) => {
 
 // Get All Products
 exports.getAllProducts = async (req, res) => {
-  const { categoryId, companyId, search, page = 1, limit = 10 } = req.query;
+  const { categoryid, companyid, search, page = 1, limit = 10 } = req.query;
 
   // Validate pagination parameters
   const pageNum = parseInt(page, 10);
@@ -132,13 +152,13 @@ exports.getAllProducts = async (req, res) => {
   if (isNaN(pageNum) || pageNum < 1) {
     return res.status(400).json({ error: 'Invalid page number: Must be a positive integer' });
   }
-  if (isNaN(limitNum) || limitNum < 1) {
-    return res.status(400).json({ error: 'Invalid limit: Must be a positive integer' });
+  if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+    return res.status(400).json({ error: 'Invalid limit: Must be a positive integer not exceeding 100' });
   }
 
   // UUID validation
-  if (categoryId && !validator.isUUID(categoryId)) {
-    return res.status(400).json({ error: 'Invalid categoryId format: Must be a valid UUID' });
+  if (categoryid && !validator.isUUID(categoryid)) {
+    return res.status(400).json({ error: 'Invalid categoryid format: Must be a valid UUID' });
   }
 
   // Search parameter validation
@@ -146,8 +166,9 @@ exports.getAllProducts = async (req, res) => {
     return res.status(400).json({ error: 'search must be between 1 and 255 characters' });
   }
 
-  // Sanitize search input
-  const sanitizedSearch = search ? xss(search) : null;
+  // Sanitize inputs
+  const sanitizedSearch = search ? xss(search.trim()) : null;
+  const sanitizedCompanyid = companyid ? xss(companyid.trim()) : null;
 
   try {
     const client = await pool.connect();
@@ -156,12 +177,13 @@ exports.getAllProducts = async (req, res) => {
 
       let query = `
         SELECT 
-          p.*,
-          u.name AS createdByName,
-          pc.categoryName
+          p.id, p.productcode, p.productname, p.categoryid, p.brand, p.price,
+          p.gstpercentage, p.hsncode, p.productimages, p.createdbyid, p.companyid, p.createdon,
+          u.name AS createdbyname,
+          pc.categoryname
         FROM public.products p
-        LEFT JOIN public.users u ON p.createdById = u.id
-        LEFT JOIN public.product_categories pc ON p.categoryId = pc.id
+        LEFT JOIN public.users u ON p.createdbyid = u.id
+        LEFT JOIN public.productcategories pc ON p.categoryid = pc.id
         WHERE 1=1
       `;
       let countQuery = `SELECT COUNT(*) FROM public.products WHERE 1=1`;
@@ -169,31 +191,31 @@ exports.getAllProducts = async (req, res) => {
       const countParams = [];
       let paramIndex = 1;
 
-      if (categoryId) {
-        query += ` AND p.categoryId = $${paramIndex}::uuid`;
-        countQuery += ` AND categoryId = $${paramIndex}::uuid`;
-        queryParams.push(categoryId);
-        countParams.push(categoryId);
+      if (categoryid) {
+        query += ` AND p.categoryid = $${paramIndex}::uuid`;
+        countQuery += ` AND categoryid = $${paramIndex}::uuid`;
+        queryParams.push(categoryid);
+        countParams.push(categoryid);
         paramIndex++;
       }
 
-      if (companyId) {
-        query += ` AND p.companyId = $${paramIndex}`;
-        countQuery += ` AND companyId = $${paramIndex}`;
-        queryParams.push(companyId);
-        countParams.push(companyId);
+      if (sanitizedCompanyid) {
+        query += ` AND p.companyid = $${paramIndex}`;
+        countQuery += ` AND companyid = $${paramIndex}`;
+        queryParams.push(sanitizedCompanyid);
+        countParams.push(sanitizedCompanyid);
         paramIndex++;
       }
 
       if (sanitizedSearch) {
-        query += ` AND p.productName ILIKE $${paramIndex}`;
-        countQuery += ` AND productName ILIKE $${paramIndex}`;
+        query += ` AND p.productname ILIKE $${paramIndex}`;
+        countQuery += ` AND productname ILIKE $${paramIndex}`;
         queryParams.push(`%${sanitizedSearch}%`);
         countParams.push(`%${sanitizedSearch}%`);
         paramIndex++;
       }
 
-      query += ` ORDER BY p.createdOn DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      query += ` ORDER BY p.createdon DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       queryParams.push(limitNum, offset);
 
       const [result, countResult] = await Promise.all([
@@ -243,12 +265,13 @@ exports.getProductById = async (req, res) => {
     try {
       const result = await client.query(
         `SELECT 
-          p.*,
-          u.name AS createdByName,
-          pc.categoryName
+          p.id, p.productcode, p.productname, p.categoryid, p.brand, p.price,
+          p.gstpercentage, p.hsncode, p.productimages, p.createdbyid, p.companyid, p.createdon,
+          u.name AS createdbyname,
+          pc.categoryname
         FROM public.products p
-        LEFT JOIN public.users u ON p.createdById = u.id
-        LEFT JOIN public.product_categories pc ON p.categoryId = pc.id
+        LEFT JOIN public.users u ON p.createdbyid = u.id
+        LEFT JOIN public.productcategories pc ON p.categoryid = pc.id
         WHERE p.id = $1`,
         [id]
       );
@@ -281,83 +304,120 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   const {
-    productCode, productName, categoryId, brand, price,
-    gstPercentage, hsnCode, productImages, createdById, companyId
+    productcode, productname, categoryid, brand, price,
+    gstpercentage, hsncode, productimages, createdbyid, companyid
   } = req.body;
 
-  if (!productCode || !productName || !createdById || !companyId) {
-    return res.status(400).json({ error: 'productCode, productName, createdById, and companyId are required' });
+  if (!validator.isUUID(id)) {
+    return res.status(400).json({ error: 'id must be a valid UUID' });
   }
 
-  if (!validator.isUUID(createdById)) {
-    return res.status(400).json({ error: 'createdById must be a valid UUID' });
-  }
-  if (categoryId && !validator.isUUID(categoryId)) {
-    return res.status(400).json({ error: 'categoryId must be a valid UUID' });
+  if (!productcode || !productname || !createdbyid || !companyid) {
+    return res.status(400).json({ error: 'productcode, productname, createdbyid, and companyid are required' });
   }
 
-  if (!validator.isLength(productCode, { min: 1, max: 50 })) {
-    return res.status(400).json({ error: 'productCode must be between 1 and 50 characters' });
+  if (!validator.isUUID(createdbyid)) {
+    return res.status(400).json({ error: 'createdbyid must be a valid UUID' });
   }
-  if (!validator.isLength(productName, { min: 1, max: 255 })) {
-    return res.status(400).json({ error: 'productName must be between 1 and 255 characters' });
+  if (categoryid && !validator.isUUID(categoryid)) {
+    return res.status(400).json({ error: 'categoryid must be a valid UUID' });
+  }
+
+  if (!validator.isLength(productcode, { min: 1, max: 50 })) {
+    return res.status(400).json({ error: 'productcode must be between 1 and 50 characters' });
+  }
+  if (!validator.isLength(productname, { min: 1, max: 255 })) {
+    return res.status(400).json({ error: 'productname must be between 1 and 255 characters' });
   }
   if (brand && !validator.isLength(brand, { min: 1, max: 100 })) {
     return res.status(400).json({ error: 'brand must be between 1 and 100 characters if provided' });
   }
-
-  if (hsnCode && !/^\d{6,8}$/.test(hsnCode)) {
-    return res.status(400).json({ error: 'hsnCode must be a 6-8 digit number if provided' });
+  if (!validator.isLength(companyid, { min: 1, max: 50 })) {
+    return res.status(400).json({ error: 'companyid must be between 1 and 50 characters' });
   }
 
-  if (productImages) {
-    if (!Array.isArray(productImages)) {
-      return res.status(400).json({ error: 'productImages must be an array' });
+  if (hsncode && !/^\d{6,8}$/.test(hsncode)) {
+    return res.status(400).json({ error: 'hsncode must be a 6-8 digit number if provided' });
+  }
+
+  if (price && !validator.isDecimal(price.toString(), { min: 0 })) {
+    return res.status(400).json({ error: 'price must be a valid non-negative decimal number if provided' });
+  }
+  if (gstpercentage && !validator.isDecimal(gstpercentage.toString(), { min: 0, max: 100 })) {
+    return res.status(400).json({ error: 'gstpercentage must be a valid decimal number between 0 and 100 if provided' });
+  }
+
+  if (productimages) {
+    if (!Array.isArray(productimages)) {
+      return res.status(400).json({ error: 'productimages must be an array' });
     }
-    for (const image of productImages) {
+    for (const image of productimages) {
       if (!validator.isURL(image, { require_protocol: true })) {
-        return res.status(400).json({ error: 'Each productImages entry must be a valid URL with protocol' });
+        return res.status(400).json({ error: 'Each productimages entry must be a valid URL with protocol' });
       }
     }
   }
 
-  const sanitizedProductCode = xss(productCode);
-  const sanitizedProductName = xss(productName);
-  const sanitizedBrand = brand ? xss(brand) : null;
-  const sanitizedHsnCode = hsnCode ? xss(hsnCode) : null;
-  const sanitizedProductImages = productImages ? productImages.map(img => xss(img)) : null;
-  const sanitizedPrice = price ? xss(price) : null;
-  const sanitizedGstPercentage = gstPercentage ? xss(gstPercentage) : null;
-  const sanitizedCompanyId = xss(companyId);
+  const sanitizedProductcode = xss(productcode.trim());
+  const sanitizedProductname = xss(productname.trim());
+  const sanitizedBrand = brand ? xss(brand.trim()) : null;
+  const sanitizedHsncode = hsncode ? xss(hsncode.trim()) : null;
+  const sanitizedProductimages = productimages ? productimages.map(img => xss(img.trim())) : null;
+  const sanitizedPrice = price ? xss(price.toString().trim()) : null;
+  const sanitizedGstpercentage = gstpercentage ? xss(gstpercentage.toString().trim()) : null;
+  const sanitizedCompanyid = xss(companyid.trim());
 
   try {
     const client = await pool.connect();
     try {
-      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [createdById]);
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Verify createdbyid exists in users table
+      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdbyid]);
       if (userCheck.rowCount === 0) {
-        return res.status(400).json({ error: 'Invalid createdById: user does not exist' });
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid createdbyid: user does not exist' });
       }
 
-      if (categoryId) {
-        const categoryCheck = await client.query('SELECT 1 FROM product_categories WHERE id = $1', [categoryId]);
+      // Verify categoryid exists if provided
+      if (categoryid) {
+        const categoryCheck = await client.query('SELECT 1 FROM public.productcategories WHERE id = $1', [categoryid]);
         if (categoryCheck.rowCount === 0) {
-          return res.status(400).json({ error: 'Invalid categoryId: category does not exist' });
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Invalid categoryid: category does not exist' });
         }
       }
 
+      // Check for duplicate productcode for the same company
+      const duplicateCheck = await client.query(
+        'SELECT 1 FROM public.products WHERE companyid = $1 AND productcode = $2 AND id != $3',
+        [sanitizedCompanyid, sanitizedProductcode, id]
+      );
+      if (duplicateCheck.rowCount > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Product code already exists for this company' });
+      }
+
       const result = await client.query(
-        `UPDATE products SET 
-          productCode = $1, productName = $2, categoryId = $3, brand = $4, price = $5,
-          gstPercentage = $6, hsnCode = $7, productImages = $8, createdById = $9, companyId = $10
-        WHERE id = $11 RETURNING *`,
+        `UPDATE public.products SET 
+          productcode = $1, productname = $2, categoryid = $3, brand = $4, price = $5,
+          gstpercentage = $6, hsncode = $7, productimages = $8, createdbyid = $9, companyid = $10
+        WHERE id = $11
+        RETURNING id, productcode, productname, categoryid, brand, price,
+                  gstpercentage, hsncode, productimages, createdbyid, companyid, createdon`,
         [
-          sanitizedProductCode, sanitizedProductName, categoryId, sanitizedBrand, sanitizedPrice,
-          sanitizedGstPercentage, sanitizedHsnCode, sanitizedProductImages, createdById, sanitizedCompanyId, id
+          sanitizedProductcode, sanitizedProductname, categoryid, sanitizedBrand, sanitizedPrice,
+          sanitizedGstpercentage, sanitizedHsncode, sanitizedProductimages, createdbyid, sanitizedCompanyid, id
         ]
       );
+
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Product not found' });
       }
+
+      await client.query('COMMIT');
 
       res.status(200).json({
         status: true,
@@ -365,9 +425,10 @@ exports.updateProduct = async (req, res) => {
         message: 'Product updated successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Update product error:', err.stack);
       if (err.code === '23503') {
-        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'createdbyid or categoryid does not exist' });
       }
       if (err.code === '23505') {
         return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
@@ -393,18 +454,33 @@ exports.deleteProduct = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query('DELETE FROM products WHERE id = $1 RETURNING *', [id]);
+      // Start transaction
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        `DELETE FROM public.products WHERE id = $1
+        RETURNING id, productcode, productname, categoryid, brand, price,
+                  gstpercentage, hsncode, productimages, createdbyid, companyid, createdon`,
+        [id]
+      );
+
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Product not found' });
       }
+
+      await client.query('COMMIT');
+
       res.status(200).json({
         status: true,
+        data: result.rows[0],
         message: 'Product deleted successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Delete product error:', err.stack);
       if (err.code === '23503') {
-        return res.status(400).json({ error: 'Cannot delete product due to foreign key constraint', details: 'Product is referenced by productcatalogues' });
+        return res.status(400).json({ error: 'Cannot delete product due to foreign key constraint', details: err.detail || 'Product is referenced by other records' });
       }
       res.status(500).json({ error: 'Failed to delete product', details: err.message });
     } finally {

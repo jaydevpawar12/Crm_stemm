@@ -11,7 +11,6 @@ exports.createCategory = async (req, res) => {
     return res.status(400).json({ error: 'categoryName and createdById are required' });
   }
 
-  // Validate data types and formats
   if (!validator.isUUID(createdById)) {
     return res.status(400).json({ error: 'createdById must be a valid UUID' });
   }
@@ -21,30 +20,37 @@ exports.createCategory = async (req, res) => {
   }
 
   // Sanitize inputs to prevent XSS
-  const sanitizedCategoryName = xss(categoryName);
+  const sanitizedCategoryName = xss(categoryName.trim());
 
   try {
     const client = await pool.connect();
     try {
+      // Start transaction
+      await client.query('BEGIN');
+
       // Verify createdById exists in users table
-      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [createdById]);
+      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdById]);
       if (userCheck.rowCount === 0) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Invalid createdById: user does not exist' });
       }
 
       // Check for duplicate category name for the same user
       const duplicateCheck = await client.query(
-        'SELECT 1 FROM product_categories WHERE createdById = $1 AND categoryName = $2',
+        'SELECT 1 FROM public.product_categories WHERE createdbyid = $1 AND categoryname = $2',
         [createdById, sanitizedCategoryName]
       );
       if (duplicateCheck.rowCount > 0) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Category name already exists for this user' });
       }
 
       const result = await client.query(
-        'INSERT INTO product_categories (categoryName, createdById) VALUES ($1, $2) RETURNING *',
+        'INSERT INTO public.product_categories (categoryname, createdbyid) VALUES ($1, $2) RETURNING id, categoryname, createdbyid, createdon',
         [sanitizedCategoryName, createdById]
       );
+
+      await client.query('COMMIT');
 
       res.status(201).json({
         status: true,
@@ -52,6 +58,7 @@ exports.createCategory = async (req, res) => {
         message: 'Product category created successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Create category error:', err.stack);
       if (err.code === '23503') {
         return res.status(400).json({ error: 'Invalid foreign key value', details: 'createdById does not exist in users table' });
@@ -79,8 +86,8 @@ exports.getAllCategories = async (req, res) => {
   if (isNaN(pageNum) || pageNum < 1) {
     return res.status(400).json({ error: 'Invalid page number: Must be a positive integer' });
   }
-  if (isNaN(limitNum) || limitNum < 1) {
-    return res.status(400).json({ error: 'Invalid limit: Must be a positive integer' });
+  if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+    return res.status(400).json({ error: 'Invalid limit: Must be a positive integer not exceeding 100' });
   }
 
   // Search parameter validation
@@ -89,7 +96,7 @@ exports.getAllCategories = async (req, res) => {
   }
 
   // Sanitize search input
-  const sanitizedSearch = search ? xss(search) : null;
+  const sanitizedSearch = search ? xss(search.trim()) : null;
 
   try {
     const client = await pool.connect();
@@ -98,10 +105,13 @@ exports.getAllCategories = async (req, res) => {
 
       let query = `
         SELECT 
-          pc.*,
-          u.name AS createdByName
+          pc.id,
+          pc.categoryname,
+          pc.createdbyid,
+          pc.createdon,
+          u.name AS createdbyname
         FROM public.product_categories pc
-        LEFT JOIN public.users u ON pc.createdById = u.id
+        LEFT JOIN public.users u ON pc.createdbyid = u.id
         WHERE 1=1
       `;
       let countQuery = `SELECT COUNT(*) FROM public.product_categories WHERE 1=1`;
@@ -110,14 +120,14 @@ exports.getAllCategories = async (req, res) => {
       let paramIndex = 1;
 
       if (sanitizedSearch) {
-        query += ` AND pc.categoryName ILIKE $${paramIndex}`;
-        countQuery += ` AND categoryName ILIKE $${paramIndex}`;
+        query += ` AND pc.categoryname ILIKE $${paramIndex}`;
+        countQuery += ` AND categoryname ILIKE $${paramIndex}`;
         queryParams.push(`%${sanitizedSearch}%`);
         countParams.push(`%${sanitizedSearch}%`);
         paramIndex++;
       }
 
-      query += ` ORDER BY pc.createdOn DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      query += ` ORDER BY pc.createdon DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       queryParams.push(limitNum, offset);
 
       const [result, countResult] = await Promise.all([
@@ -168,12 +178,12 @@ exports.getCategoryById = async (req, res) => {
       const result = await client.query(
         `SELECT 
           pc.id, 
-          pc.createdById, 
-          u.name AS createdByName, 
-          pc.categoryName,
-          pc.createdOn
-        FROM product_categories pc
-        LEFT JOIN users u ON pc.createdById = u.id
+          pc.categoryname, 
+          pc.createdbyid, 
+          u.name AS createdbyname, 
+          pc.createdon
+        FROM public.product_categories pc
+        LEFT JOIN public.users u ON pc.createdbyid = u.id
         WHERE pc.id = $1`,
         [id]
       );
@@ -193,7 +203,7 @@ exports.getCategoryById = async (req, res) => {
         return res.status(400).json({ error: 'Invalid UUID format', details: err.message });
       }
       res.status(500).json({ error: 'Failed to fetch category', details: err.message });
-    } finally {
+  } finally {
       client.release();
     }
   } catch (err) {
@@ -207,6 +217,10 @@ exports.updateCategory = async (req, res) => {
   const { id } = req.params;
   const { categoryName, createdById } = req.body;
 
+  if (!validator.isUUID(id)) {
+    return res.status(400).json({ error: 'id must be a valid UUID' });
+  }
+
   if (!categoryName || !createdById) {
     return res.status(400).json({ error: 'categoryName and createdById are required' });
   }
@@ -219,23 +233,42 @@ exports.updateCategory = async (req, res) => {
     return res.status(400).json({ error: 'categoryName must be between 1 and 255 characters' });
   }
 
-  const sanitizedCategoryName = xss(categoryName);
+  const sanitizedCategoryName = xss(categoryName.trim());
 
   try {
     const client = await pool.connect();
     try {
-      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [createdById]);
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Verify createdById exists in users table
+      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdById]);
       if (userCheck.rowCount === 0) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Invalid createdById: user does not exist' });
       }
 
+      // Check for duplicate category name for the same user
+      const duplicateCheck = await client.query(
+        'SELECT 1 FROM public.product_categories WHERE createdbyid = $1 AND categoryname = $2 AND id != $3',
+        [createdById, sanitizedCategoryName, id]
+      );
+      if (duplicateCheck.rowCount > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Category name already exists for this user' });
+      }
+
       const result = await client.query(
-        'UPDATE product_categories SET categoryName = $1, createdById = $2 WHERE id = $3 RETURNING *',
+        'UPDATE public.product_categories SET categoryname = $1, createdbyid = $2 WHERE id = $3 RETURNING id, categoryname, createdbyid, createdon',
         [sanitizedCategoryName, createdById, id]
       );
+
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Category not found' });
       }
+
+      await client.query('COMMIT');
 
       res.status(200).json({
         status: true,
@@ -243,9 +276,13 @@ exports.updateCategory = async (req, res) => {
         message: 'Product category updated successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Update category error:', err.stack);
       if (err.code === '23503') {
         return res.status(400).json({ error: 'Invalid foreign key value', details: 'createdById does not exist in users table' });
+      }
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Duplicate key value', details: 'Unique constraint violation' });
       }
       res.status(500).json({ error: 'Failed to update category', details: err.message });
     } finally {
@@ -268,18 +305,30 @@ exports.deleteCategory = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query('DELETE FROM product_categories WHERE id = $1 RETURNING *', [id]);
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        'DELETE FROM public.product_categories WHERE id = $1 RETURNING id, categoryname, createdbyid, createdon',
+        [id]
+      );
+
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Category not found' });
       }
+
+      await client.query('COMMIT');
+
       res.status(200).json({
         status: true,
+        data: result.rows[0],
         message: 'Category deleted successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Delete category error:', err.stack);
       if (err.code === '23503') {
-        return res.status(400).json({ error: 'Cannot delete category due to foreign key constraint', details: 'Category is referenced by products' });
+        return res.status(400).json({ error: 'Cannot delete category due to foreign key constraint', details: 'Category is referenced by other records' });
       }
       res.status(500).json({ error: 'Failed to delete category', details: err.message });
     } finally {
