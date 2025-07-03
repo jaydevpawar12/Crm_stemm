@@ -148,7 +148,7 @@ exports.getCustomers = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const { assignedToId, createdBy, companyId, page = 1, limit = 10, search } = req.query;
+      const { assignedToId, createdBy, companyId, page = 1, limit = 10, search, tags } = req.query;
 
       // Validate page and limit
       const pageNum = parseInt(page, 10);
@@ -178,6 +178,36 @@ exports.getCustomers = async (req, res) => {
         return res.status(400).json({ error: 'Invalid companyId: Must be a string' });
       }
 
+      // Validate tags parameter
+      let tagIds = [];
+      if (tags) {
+        if (typeof tags === 'string') {
+          tagIds = tags.split(',').map(id => id.trim()).filter(id => id);
+        } else if (Array.isArray(tags)) {
+          tagIds = tags.map(id => id.trim()).filter(id => id);
+        } else {
+          return res.status(400).json({ error: 'Invalid tags: Must be a comma-separated string or array of UUIDs' });
+        }
+
+        // Validate each tag ID
+        for (const tagId of tagIds) {
+          if (!isUUID(tagId)) {
+            return res.status(400).json({ error: `Invalid tag ID: ${tagId} is not a valid UUID` });
+          }
+        }
+
+        // Validate tags exist
+        if (tagIds.length > 0) {
+          const tagCheck = await client.query(
+            'SELECT id FROM customertags WHERE id = ANY($1::uuid[])',
+            [tagIds]
+          );
+          if (tagCheck.rows.length !== tagIds.length) {
+            return res.status(400).json({ error: 'One or more tag IDs do not exist' });
+          }
+        }
+      }
+
       // Validate assignedToId exists
       if (assignedToId) {
         const assigneeCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assignedToId]);
@@ -201,7 +231,27 @@ exports.getCustomers = async (req, res) => {
         SELECT 
           c.*,
           u1.name AS assigned_to_name,
-          u2.name AS created_by_name
+          u2.name AS created_by_name,
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object('id', cc.id, 'name', cc.name)
+              )
+              FROM customercategory cc
+              WHERE cc.id = ANY(c.category)
+            ),
+            '[]'::json
+          ) AS category_details,
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object('id', ct.id, 'name', ct.name)
+              )
+              FROM customertags ct
+              WHERE ct.id = ANY(c.tags)
+            ),
+            '[]'::json
+          ) AS tags_details
         FROM customers c
         LEFT JOIN users u1 ON c.assigned_to_id = u1.id
         LEFT JOIN users u2 ON c.created_by = u2.id
@@ -229,6 +279,11 @@ exports.getCustomers = async (req, res) => {
         const trimmedSearch = search.trim();
         conditions.push(`(LOWER(c.name) LIKE LOWER($${paramCount}) OR LOWER(c.company_name) LIKE LOWER($${paramCount}))`);
         values.push(`%${trimmedSearch}%`);
+        paramCount++;
+      }
+      if (tagIds.length > 0) {
+        conditions.push(`c.tags @> $${paramCount}::uuid[]`);
+        values.push(tagIds);
         paramCount++;
       }
 
@@ -264,6 +319,11 @@ exports.getCustomers = async (req, res) => {
         const trimmedSearch = search.trim();
         countConditions.push(`(LOWER(c.name) LIKE LOWER($${countParamIndex}) OR LOWER(c.company_name) LIKE LOWER($${countParamIndex}))`);
         countParams.push(`%${trimmedSearch}%`);
+        countParamIndex++;
+      }
+      if (tagIds.length > 0) {
+        countConditions.push(`c.tags @> $${countParamIndex}::uuid[]`);
+        countParams.push(tagIds);
         countParamIndex++;
       }
 

@@ -411,20 +411,37 @@ exports.deleteCustomerTag = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
+      // Begin transaction
+      await client.query('BEGIN');
+
+      // Remove the tag ID from customers.tags array
+      await client.query(
+        `UPDATE customers 
+         SET tags = array_remove(tags, $1)
+         WHERE $1 = ANY(tags)`,
+        [id]
+      );
+
+      // Delete the tag
       const result = await client.query(
         `DELETE FROM customertags WHERE id = $1 RETURNING *`,
         [id]
       );
 
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Customer tag not found' });
       }
+
+      // Commit transaction
+      await client.query('COMMIT');
 
       res.status(200).json({
         status: true,
         message: 'Customer tag deleted successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Delete customer tag error:', err.stack);
       if (err.code === '23503') {
         return res.status(400).json({

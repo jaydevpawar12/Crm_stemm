@@ -359,25 +359,42 @@ exports.deleteCustomerCategory = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
+      // Begin transaction
+      await client.query('BEGIN');
+
+      // Remove the category ID from customers.category array
+      await client.query(
+        `UPDATE customers 
+         SET category = array_remove(category, $1)
+         WHERE $1 = ANY(category)`,
+        [id]
+      );
+
+      // Delete the category (this will also cascade to customertags due to ON DELETE CASCADE)
       const result = await client.query(
         `DELETE FROM customercategory WHERE id = $1 RETURNING *`,
         [id]
       );
 
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Customer category not found' });
       }
+
+      // Commit transaction
+      await client.query('COMMIT');
 
       res.status(200).json({
         status: true,
         message: 'Customer category deleted successfully'
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Delete customer category error:', err.stack);
       if (err.code === '23503') {
         return res.status(400).json({
           error: 'Cannot delete customer category due to foreign key constraint',
-          details: err.detail || 'Category is referenced by customer tags'
+          details: err.detail || 'Category is referenced by other records'
         });
       }
       if (err.code === '22P02') {

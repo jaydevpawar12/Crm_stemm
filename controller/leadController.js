@@ -21,6 +21,7 @@ const toCamelCase = (obj) => {
     if (camelKey === 'iscompleted') camelKey = 'isCompleted';
     if (camelKey === 'isdeal') camelKey = 'isDeal';
     if (camelKey === 'companyid') camelKey = 'companyId';
+    if (camelKey === 'closingdate') camelKey = 'closingDate';
     newObj[camelKey] = obj[key];
   }
   return newObj;
@@ -41,7 +42,8 @@ exports.createLead = async (req, res) => {
     isCompleted = false,
     phone,
     isDeal = false,
-    companyId
+    companyId,
+    closingDate
   } = req.body;
 
   // Validate UUID fields
@@ -56,13 +58,21 @@ exports.createLead = async (req, res) => {
   }
 
   // Validate phone format if provided
-  if (phone && !/^\d{10}$/.test(phone)) {
-    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  if (phone && !/^\+?\d{10,15}$/.test(phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10-15 digits, optionally starting with +' });
   }
 
   // Validate companyId if provided
   if (companyId && !companyId.trim()) {
     return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
+  // Validate closingDate format if provided
+  if (closingDate) {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$/;
+    if (!dateRegex.test(closingDate) || isNaN(Date.parse(closingDate))) {
+      return res.status(400).json({ error: 'Invalid closingDate: Must be a valid ISO 8601 date (e.g., 2025-07-02T18:30:00Z)' });
+    }
   }
 
   try {
@@ -91,12 +101,12 @@ exports.createLead = async (req, res) => {
       const result = await client.query(
         `INSERT INTO leads (
           customerId, source, status, assignedTo, notes, leadName, updatedById,
-          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId, closingDate
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING *`,
         [
           customerId, source, status, assignedTo, notes, leadName, updatedById,
-          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId
+          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId, closingDate
         ]
       );
 
@@ -115,6 +125,9 @@ exports.createLead = async (req, res) => {
       if (err.code === '23505') {
         return res.status(400).json({ error: 'Duplicate key value', details: err.detail });
       }
+      if (err.code === '22007') {
+        return res.status(400).json({ error: 'Invalid closingDate format', details: err.message });
+      }
       res.status(500).json({ error: 'Failed to create lead', details: err.message });
     } finally {
       client.release();
@@ -124,181 +137,6 @@ exports.createLead = async (req, res) => {
     res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
-
-// exports.getAllLeads = async (req, res) => {
-//   try {
-//     const client = await pool.connect();
-//     try {
-//       // Extract query parameters
-//       const {
-//         customerId,
-//         assignedTo,
-//         updatedById,
-//         status,
-//         stage,
-//         companyId,
-//         search,
-//         page = 1,
-//         limit = 10
-//       } = req.query;
-
-//       // Validate UUID fields
-//       if (customerId && !isUUID(customerId)) {
-//         return res.status(400).json({ error: 'Invalid customerId: Must be a valid UUID' });
-//       }
-//       if (assignedTo && !isUUID(assignedTo)) {
-//         return res.status(400).json({ error: 'Invalid assignedTo: Must be a valid UUID' });
-//       }
-//       if (updatedById && !isUUID(updatedById)) {
-//         return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
-//       }
-
-//       // Validate companyId
-//       if (companyId && !companyId.trim()) {
-//         return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
-//       }
-
-//       // Validate search parameter
-//       if (search && typeof search !== 'string') {
-//         return res.status(400).json({ error: 'Invalid search parameter: Must be a string' });
-//       }
-
-//       // Validate pagination inputs
-//       const pageNum = parseInt(page, 10);
-//       const limitNum = parseInt(limit, 10);
-//       if (isNaN(pageNum) || pageNum < 1) {
-//         return res.status(400).json({ error: 'Invalid page number: Must be a positive integer' });
-//       }
-//       if (isNaN(limitNum) || limitNum < 1) {
-//         return res.status(400).json({ error: 'Invalid limit: Must be a positive integer' });
-//       }
-
-//       const offset = (pageNum - 1) * limitNum;
-
-//       // Base query
-//       let query = `
-//         SELECT 
-//           leads.*,
-//           u1.name AS assignedTo_name,
-//           u2.name AS updatedBy_name,
-//           c.name AS customer_name
-//         FROM leads
-//         LEFT JOIN users u1 ON leads.assignedTo = u1.id
-//         LEFT JOIN users u2 ON leads.updatedById = u2.id
-//         LEFT JOIN customers c ON leads.customerId = c.id
-//         WHERE 1=1
-//       `;
-//       const values = [];
-//       let paramIndex = 1;
-
-//       if (customerId) {
-//         query += ` AND leads.customerId = $${paramIndex}::uuid`;
-//         values.push(customerId);
-//         paramIndex++;
-//       }
-//       if (assignedTo) {
-//         query += ` AND leads.assignedTo = $${paramIndex}::uuid`;
-//         values.push(assignedTo);
-//         paramIndex++;
-//       }
-//       if (updatedById) {
-//         query += ` AND leads.updatedById = $${paramIndex}::uuid`;
-//         values.push(updatedById);
-//         paramIndex++;
-//       }
-//       if (status) {
-//         query += ` AND leads.status = $${paramIndex}`;
-//         values.push(status);
-//         paramIndex++;
-//       }
-//       if (stage) {
-//         query += ` AND leads.stage = $${paramIndex}`;
-//         values.push(stage);
-//         paramIndex++;
-//       }
-//       if (companyId) {
-//         query += ` AND leads.companyId = $${paramIndex}`;
-//         values.push(companyId);
-//         paramIndex++;
-//       }
-//       if (search) {
-//         query += ` AND LOWER(leads.name) LIKE LOWER($${paramIndex})`;
-//         values.push(`%${search.trim()}%`);
-//         paramIndex++;
-//       }
-
-//       // Add pagination
-//       query += ` ORDER BY leads.createdAt DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-//       values.push(limitNum, offset);
-
-//       // Total count query
-//       let countQuery = `SELECT COUNT(*) FROM leads WHERE 1=1`;
-//       const countValues = [];
-//       let countIndex = 1;
-
-//       if (customerId) {
-//         countQuery += ` AND customerId = $${countIndex}::uuid`;
-//         countValues.push(customerId);
-//         countIndex++;
-//       }
-//       if (assignedTo) {
-//         countQuery += ` AND assignedTo = $${countIndex}::uuid`;
-//         countValues.push(assignedTo);
-//         countIndex++;
-//       }
-//       if (updatedById) {
-//         countQuery += ` AND updatedById = $${countIndex}::uuid`;
-//         countValues.push(updatedById);
-//         countIndex++;
-//       }
-//       if (status) {
-//         countQuery += ` AND status = $${countIndex}`;
-//         countValues.push(status);
-//         countIndex++;
-//       }
-//       if (stage) {
-//         countQuery += ` AND stage = $${countIndex}`;
-//         countValues.push(stage);
-//         countIndex++;
-//       }
-//       if (companyId) {
-//         countQuery += ` AND companyId = $${countIndex}`;
-//         countValues.push(companyId);
-//         countIndex++;
-//       }
-//       if (search) {
-//         countQuery += ` AND LOWER(name) LIKE LOWER($${countIndex})`;
-//         countValues.push(`%${search.trim()}%`);
-//         countIndex++;
-//       }
-
-//       // Execute both queries
-//       const [dataResult, countResult] = await Promise.all([
-//         client.query(query, values),
-//         client.query(countQuery, countValues)
-//       ]);
-
-//       const totalCount = parseInt(countResult.rows[0].count, 10);
-//       const totalPages = Math.ceil(totalCount / limitNum);
-
-//       res.status(200).json({
-//         status: true,
-//         data: { dataList: dataResult.rows },
-//         page: pageNum,
-//         limit: limitNum,
-//         totalCount,
-//         totalPages,
-//         message: "Leads fetched successfully"
-//       });
-//     } finally {
-//       client.release();
-//     }
-//   } catch (err) {
-//     console.error('Get leads error:', err.stack);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// };
-
 
 exports.getAllLeads = async (req, res) => {
   try {
@@ -314,7 +152,9 @@ exports.getAllLeads = async (req, res) => {
         companyId,
         search,
         page = 1,
-        limit = 10
+        limit = 10,
+        closingDateFrom,
+        closingDateTo
       } = req.query;
 
       // Validate UUID fields
@@ -336,6 +176,15 @@ exports.getAllLeads = async (req, res) => {
       // Validate search parameter
       if (search && typeof search !== 'string') {
         return res.status(400).json({ error: 'Invalid search parameter: Must be a string' });
+      }
+
+      // Validate closingDateFrom and closingDateTo
+      const dateRegex = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?)?$/;
+      if (closingDateFrom && (!dateRegex.test(closingDateFrom) || isNaN(Date.parse(closingDateFrom)))) {
+        return res.status(400).json({ error: 'Invalid closingDateFrom: Must be a valid ISO 8601 date (e.g., 2025-07-02 or 2025-07-02T00:00:00Z)' });
+      }
+      if (closingDateTo && (!dateRegex.test(closingDateTo) || isNaN(Date.parse(closingDateTo)))) {
+        return res.status(400).json({ error: 'Invalid closingDateTo: Must be a valid ISO 8601 date (e.g., 2025-07-02 or 2025-07-02T23:59:59Z)' });
       }
 
       // Validate pagination inputs
@@ -401,6 +250,16 @@ exports.getAllLeads = async (req, res) => {
         values.push(`%${search.trim()}%`);
         paramIndex++;
       }
+      if (closingDateFrom) {
+        query += ` AND leads.closingDate >= $${paramIndex}`;
+        values.push(closingDateFrom);
+        paramIndex++;
+      }
+      if (closingDateTo) {
+        query += ` AND leads.closingDate <= $${paramIndex}`;
+        values.push(closingDateTo);
+        paramIndex++;
+      }
 
       // Add pagination
       query += ` ORDER BY leads.createdAt DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
@@ -446,6 +305,16 @@ exports.getAllLeads = async (req, res) => {
         countValues.push(`%${search.trim()}%`);
         countIndex++;
       }
+      if (closingDateFrom) {
+        countQuery += ` AND closingDate >= $${countIndex}`;
+        countValues.push(closingDateFrom);
+        countIndex++;
+      }
+      if (closingDateTo) {
+        countQuery += ` AND closingDate <= $${countIndex}`;
+        countValues.push(closingDateTo);
+        countIndex++;
+      }
 
       // Execute both queries
       const [dataResult, countResult] = await Promise.all([
@@ -468,12 +337,18 @@ exports.getAllLeads = async (req, res) => {
         totalPages,
         message: "Leads fetched successfully"
       });
+    } catch (err) {
+      console.error('Get leads error:', err.stack);
+      if (err.code === '22007') {
+        return res.status(400).json({ error: 'Invalid date format in query parameters', details: err.message });
+      }
+      res.status(500).json({ error: 'Internal server error', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Get leads error:', err.stack);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
 
@@ -492,8 +367,8 @@ exports.getLeadsByCompanyId = async (req, res) => {
         `
         SELECT 
           leads.*,
-          u1.name AS assignedTo_name,
-          u2.name AS updatedBy_name,
+          u1.name AS assignedto_name,
+          u2.name AS updatedby_name,
           c.name AS customer_name
         FROM leads
         LEFT JOIN users u1 ON leads.assignedTo = u1.id
@@ -504,18 +379,24 @@ exports.getLeadsByCompanyId = async (req, res) => {
         `,
         [companyId]
       );
-      const camelCaseData = toCamelCase(result.rows[0]);
+
+      // Convert snake_case to camelCase for each row
+      const camelCaseRows = result.rows.map(row => toCamelCase(row));
+
       res.status(200).json({
         status: true,
-        data:camelCaseData ,
+        data: camelCaseRows,
         message: "Leads fetched successfully"
       });
+    } catch (err) {
+      console.error('Get leads by companyId error:', err.stack);
+      res.status(500).json({ error: 'Internal server error', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Get leads by companyId error:', err.stack);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
 
@@ -534,8 +415,8 @@ exports.getLeadById = async (req, res) => {
         `
         SELECT 
           leads.*,
-          u1.name AS assignedTo_name,
-          u2.name AS updatedBy_name,
+          u1.name AS assignedto_name,
+          u2.name AS updatedby_name,
           c.name AS customer_name
         FROM leads
         LEFT JOIN users u1 ON leads.assignedTo = u1.id
@@ -550,20 +431,22 @@ exports.getLeadById = async (req, res) => {
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-     const camelCaseData = toCamelCase(result.rows[0]);
-
+      const camelCaseData = toCamelCase(result.rows[0]);
 
       res.status(200).json({
         status: true,
         data: camelCaseData,
         message: 'Lead fetched successfully'
       });
+    } catch (err) {
+      console.error('Get lead error:', err.stack);
+      res.status(500).json({ error: 'Internal server error', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Get lead error:', err.stack);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
 
@@ -584,7 +467,8 @@ exports.updateLead = async (req, res) => {
     isCompleted,
     phone,
     isDeal,
-    companyId
+    companyId,
+    closingDate
   } = req.body;
 
   // Validate UUID fields
@@ -602,13 +486,21 @@ exports.updateLead = async (req, res) => {
   }
 
   // Validate phone format if provided
-  if (phone && !/^\d{10}$/.test(phone)) {
-    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  if (phone && !/^\+?\d{10,15}$/.test(phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10-15 digits, optionally starting with +' });
   }
 
   // Validate companyId if provided
   if (companyId && !companyId.trim()) {
     return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
+  // Validate closingDate format if provided
+  if (closingDate) {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$/;
+    if (!dateRegex.test(closingDate) || isNaN(Date.parse(closingDate))) {
+      return res.status(400).json({ error: 'Invalid closingDate: Must be a valid ISO 8601 date (e.g., 2025-07-02T18:30:00Z)' });
+    }
   }
 
   try {
@@ -638,33 +530,41 @@ exports.updateLead = async (req, res) => {
         `UPDATE leads
          SET customerId = $1, source = $2, status = $3, assignedTo = $4, notes = $5,
              leadName = $6, updatedById = $7, updatedOn = $8, stage = $9, subCategory = $10,
-             isClose = $11, isCompleted = $12, phone = $13, isDeal = $14, companyId = $15
-         WHERE id = $16 RETURNING *`,
+             isClose = $11, isCompleted = $12, phone = $13, isDeal = $14, companyId = $15,
+             closingDate = $16
+         WHERE id = $17 RETURNING *`,
         [
           customerId, source, status, assignedTo, notes, leadName, updatedById,
-          updatedOn, stage, subCategory, isClose, isCompleted, phone, isDeal, companyId, id
+          updatedOn, stage, subCategory, isClose, isCompleted, phone, isDeal, companyId,
+          closingDate, id
         ]
       );
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Lead not found' });
       }
-      
+
       const camelCaseData = toCamelCase(result.rows[0]);
       res.status(200).json({
         status: true,
         data: camelCaseData,
         message: 'Lead updated successfully'
       });
+    } catch (err) {
+      console.error('Update lead error:', err.stack);
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail });
+      }
+      if (err.code === '22007') {
+        return res.status(400).json({ error: 'Invalid date format', details: err.message });
+      }
+      res.status(500).json({ error: 'Internal server error', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Update lead error:', err.stack);
-    if (err.code === '23503') {
-      return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail });
-    }
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
 
@@ -692,13 +592,21 @@ exports.patchLead = async (req, res) => {
   }
 
   // Validate phone format if provided
-  if (req.body.phone && !/^\d{10}$/.test(req.body.phone)) {
-    return res.status(400).json({ error: 'Invalid phone number: Must be 10 digits' });
+  if (req.body.phone && !/^\+?\d{10,15}$/.test(req.body.phone)) {
+    return res.status(400).json({ error: 'Invalid phone number: Must be 10-15 digits, optionally starting with +' });
   }
 
   // Validate companyId if provided
   if (req.body.companyId && !req.body.companyId.trim()) {
     return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
+  // Validate closingDate format if provided
+  if (req.body.closingDate) {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$/;
+    if (!dateRegex.test(req.body.closingDate) || isNaN(Date.parse(req.body.closingDate))) {
+      return res.status(400).json({ error: 'Invalid closingDate: Must be a valid ISO 8601 date (e.g., 2025-07-02T18:30:00Z)' });
+    }
   }
 
   try {
@@ -724,44 +632,63 @@ exports.patchLead = async (req, res) => {
         }
       }
 
-      const setString = fields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
-      const values = fields.map(([, value]) => value);
+      // Map camelCase to snake_case for database
+      const snakeCaseFields = fields.map(([key, value]) => {
+        let snakeKey = key;
+        if (key === 'customerId') snakeKey = 'customerid';
+        if (key === 'assignedTo') snakeKey = 'assignedto';
+        if (key === 'updatedById') snakeKey = 'updatedbyid';
+        if (key === 'leadName') snakeKey = 'leadname';
+        if (key === 'subCategory') snakeKey = 'subcategory';
+        if (key === 'isClose') snakeKey = 'isclose';
+        if (key === 'isCompleted') snakeKey = 'iscompleted';
+        if (key === 'isDeal') snakeKey = 'isdeal';
+        if (key === 'companyId') snakeKey = 'companyid';
+        if (key === 'updatedOn') snakeKey = 'updatedon';
+        if (key === 'closingDate') snakeKey = 'closingdate';
+        return [snakeKey, value];
+      });
+
+      const setString = snakeCaseFields.map(([key], idx) => `${key} = $${idx + 1}`).join(', ');
+      const values = snakeCaseFields.map(([, value]) => value);
 
       const result = await client.query(
-        `UPDATE leads SET ${setString} WHERE id = $${fields.length + 1} RETURNING *`,
+        `UPDATE leads SET ${setString} WHERE id = $${snakeCaseFields.length + 1} RETURNING *`,
         [...values, id]
       );
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Lead not found' });
       }
-      
+
       const camelCaseData = toCamelCase(result.rows[0]);
 
-        res.status(200).json({
+      res.status(200).json({
         status: true,
         data: camelCaseData,
-        message: 'Lead patched successfully',
-      })
-      
+        message: 'Lead patched successfully'
+      });
     } catch (err) {
-      console.error('Patch lead error:', err);
+      console.error('Patch lead error:', err.stack);
       if (err.code === '23503') {
-        return res.json({ error: 'Invalid foreign key value', details: err.detail });
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail });
       }
       if (err.code === '23505') {
-        return res.json({ error: 'Duplicate key value', details: err.detail });
+        return res.status(400).json({ error: 'Duplicate key value', details: err.detail });
       }
-      res.status(500).json({ error: 'Internal server error' });
+      if (err.code === '22007') {
+        return res.status(400).json({ error: 'Invalid date format', details: err.message });
+      }
+      res.status(500).json({ error: 'Internal server error', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Patch lead error:', err.stack);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
   }
+};
 
-}
 exports.deleteLead = async (req, res) => {
   const { id } = req.params;
 
@@ -782,11 +709,14 @@ exports.deleteLead = async (req, res) => {
         status: true,
         message: 'Lead deleted successfully'
       });
+    } catch (err) {
+      console.error('Delete lead error:', err.stack);
+      res.status(500).json({ error: 'Internal server error', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error('Delete lead error:', err.stack);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
