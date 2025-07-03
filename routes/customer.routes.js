@@ -7,5 +7,6 @@ router.get('/', customersController.getCustomers);
 router.get('/:id', customersController.getCustomerById);
 router.put('/:id', customersController.updateCustomer);
 router.delete('/:id', customersController.deleteCustomer);
+router.get('/taglist/:userId', customersController.getTagsByUserId);
 
 module.exports = router;

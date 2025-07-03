@@ -373,6 +373,60 @@ exports.getCustomers = async (req, res) => {
   }
 };
 
+exports.getTagsByUserId = async (req, res) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const { userId } = req.params;
+      console.log('Received userId:', userId);
+
+      // Validate userId
+      // if (!userId || !isUUID(userId)) {
+      //   return res.status(400).json({ error: 'Invalid userId: Must be a valid UUID' });
+      // }
+
+      // Validate user exists
+      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [userId]);
+      if (userCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid userId: User does not exist' });
+      }
+
+      // Fetch unique tags from customers where user is either assigned_to_id or created_by
+      const query = `
+        SELECT DISTINCT ct.id, ct.name
+        FROM customertags ct
+        WHERE ct.id = ANY(
+          SELECT UNNEST(tags)
+          FROM customers
+          WHERE assigned_to_id = $1 OR created_by = $1
+        )
+        ORDER BY ct.name
+      `;
+      const result = await client.query(query, [userId]);
+
+      // Convert snake_case to camelCase for each row
+      const camelCaseTags = result.rows.map(row => toCamelCase(row));
+
+      res.status(200).json({
+        status: true,
+        data: camelCaseTags,
+        message: 'Tags fetched successfully'
+      });
+    } catch (err) {
+      console.error('Get tags by userId error:', err.stack);
+      if (err.code === '22023' || err.code === '22P02') {
+        return res.status(400).json({ error: 'Invalid UUID format in query parameters', details: err.message });
+      }
+      res.status(500).json({ error: 'Failed to fetch tags', details: err.message });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Database connection failed', details: err.message });
+  }
+};
+
 // Get Customer by ID
 exports.getCustomerById = async (req, res) => {
   const { id } = req.params;
