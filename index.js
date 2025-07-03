@@ -91,6 +91,9 @@ const formResponsesRoutes = require('./routes/formResponsesRoutes');
 const notes = require('./routes/notesRoutes');
 const customerCategoryroutes = require('./routes/customerCategoryRoutes');
 const customertagsroutes = require('./routes/customerTagsRoutes');
+const categories = require('./routes/category.routes');
+const stage = require('./routes/stage.routes');
+const subCategories = require('./routes/subcategoryRoutes');
 
 
 
@@ -117,6 +120,9 @@ app.use('/api/formResponses', formResponsesRoutes);
 app.use('/api/notes', notes);
 app.use('/api/customerCategory', customerCategoryroutes);
 app.use('/api/customerTags', customertagsroutes);
+app.use('/api/categories', categories);
+app.use('/api/stage', stage);
+app.use('/api/subCategories', subCategories);
 
 
 
