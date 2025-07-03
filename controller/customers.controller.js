@@ -282,7 +282,7 @@ exports.getCustomers = async (req, res) => {
         paramCount++;
       }
       if (tagIds.length > 0) {
-        conditions.push(`c.tags @> $${paramCount}::uuid[]`);
+        conditions.push(`c.tags && $${paramCount}::uuid[]`);
         values.push(tagIds);
         paramCount++;
       }
@@ -322,7 +322,7 @@ exports.getCustomers = async (req, res) => {
         countParamIndex++;
       }
       if (tagIds.length > 0) {
-        countConditions.push(`c.tags @> $${countParamIndex}::uuid[]`);
+        countConditions.push(`c.tags && $${countParamIndex}::uuid[]`);
         countParams.push(tagIds);
         countParamIndex++;
       }
