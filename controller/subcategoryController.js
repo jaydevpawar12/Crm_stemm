@@ -1,8 +1,25 @@
 const { pool } = require('../db');
 
+const toCamelCase = (obj) => {
+  const newObj = {};
+  for (let key in obj) {
+    // Convert snake_case to camelCase
+    let camelKey = key.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+    // Ensure first letter is lowercase
+    camelKey = camelKey.replace(/^([A-Z])/, (match, letter) => letter.toLowerCase());
+    // Explicit mappings for specific fields
+    if (camelKey === 'companyid') camelKey = 'companyId';
+    if (camelKey === 'customerCategoryId') camelKey = 'customerCategoryId';
+    if (camelKey === 'categoryid') camelKey = 'categoryId';
+    if (camelKey === 'stageid') camelKey = 'stageId';
+    newObj[camelKey] = obj[key];
+  }
+  return newObj;
+};
+
 // Create Subcategory
 exports.createSubcategory = async (req, res) => {
-  const { name, categoryId, stageId } = req.body;
+  const { name, categoryId, stageId, companyId } = req.body;
   try {
     const client = await pool.connect();
     try {
@@ -14,7 +31,7 @@ exports.createSubcategory = async (req, res) => {
 
       // Check stage belongs to category
       const stageCheck = await client.query(
-        'SELECT 1 FROM stage WHERE id = $1 AND categoryId = $2',
+        'SELECT 1 FROM stage WHERE id = $1 AND categoryid = $2',
         [stageId, categoryId]
       );
       if (!stageCheck.rowCount) {
@@ -22,16 +39,15 @@ exports.createSubcategory = async (req, res) => {
       }
 
       const result = await client.query(
-        'INSERT INTO subcategory (id, name, categoryId, stageId) VALUES (gen_random_uuid(), $1, $2, $3) RETURNING *',
-        [name, categoryId, stageId]
+        'INSERT INTO subcategory (id, name, categoryid, stageid, companyid) VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING *',
+        [name, categoryId, stageId, companyId]
       );
 
-      // res.status(201).json(result.rows[0]);
-            res.status(201).json({
-              status: true,
-              data: result.rows[0],
-              message: 'SubCategory Create successfully'
-            });
+      res.status(201).json({
+        status: true,
+        data: toCamelCase(result.rows[0]),
+        message: 'Subcategory created successfully'
+      });
     } finally {
       client.release();
     }
@@ -43,16 +59,22 @@ exports.createSubcategory = async (req, res) => {
 
 // Get All Subcategories
 exports.getAllSubcategories = async (req, res) => {
+  const { companyId } = req.query; // Get companyId from query parameters
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM subcategory');
-      // res.json(result.rows);
-      res.status(201).json({
-              status: true,
-              data: {dataList:result.rows},
-              message: 'SubCategory Fetch successfully'
-            });
+      let query = 'SELECT * FROM subcategory';
+      let params = [];
+      if (companyId) {
+        query += ' WHERE companyid = $1';
+        params.push(companyId);
+      }
+      const result = await client.query(query, params);
+      res.status(200).json({
+        status: true,
+        data: { dataList: result.rows.map(toCamelCase) }, // Apply toCamelCase to each row
+        message: 'Subcategory fetched successfully'
+      });
     } finally {
       client.release();
     }
@@ -70,12 +92,11 @@ exports.getSubcategoryById = async (req, res) => {
     try {
       const result = await client.query('SELECT * FROM subcategory WHERE id = $1', [id]);
       if (!result.rows.length) return res.status(404).json({ message: 'Subcategory not found' });
-      // res.json(result.rows[0]);
-      res.status(201).json({
-              status: true,
-              data: result.rows[0],
-              message: 'SubCategory Fetch successfully'
-            });
+      res.status(200).json({
+        status: true,
+        data: toCamelCase(result.rows[0]),
+        message: 'Subcategory fetched successfully'
+      });
     } finally {
       client.release();
     }
@@ -88,7 +109,7 @@ exports.getSubcategoryById = async (req, res) => {
 // Update Subcategory
 exports.updateSubcategory = async (req, res) => {
   const { id } = req.params;
-  const { name, categoryId, stageId } = req.body;
+  const { name, categoryId, stageId, companyId } = req.body;
   try {
     const client = await pool.connect();
     try {
@@ -100,7 +121,7 @@ exports.updateSubcategory = async (req, res) => {
 
       // Validate stage belongs to category
       const stageCheck = await client.query(
-        'SELECT 1 FROM stage WHERE id = $1 AND categoryId = $2',
+        'SELECT 1 FROM stage WHERE id = $1 AND categoryid = $2',
         [stageId, categoryId]
       );
       if (!stageCheck.rowCount) {
@@ -108,16 +129,15 @@ exports.updateSubcategory = async (req, res) => {
       }
 
       const result = await client.query(
-        'UPDATE subcategory SET name = $1, categoryId = $2, stageId = $3 WHERE id = $4 RETURNING *',
-        [name, categoryId, stageId, id]
+        'UPDATE subcategory SET name = $1, categoryid = $2, stageid = $3, companyid = $4 WHERE id = $5 RETURNING *',
+        [name, categoryId, stageId, companyId, id]
       );
       if (!result.rows.length) return res.status(404).json({ message: 'Subcategory not found' });
-      // res.json(result.rows[0]);
-       res.status(201).json({
-              status: true,
-              data: result.rows[0],
-              message: 'SubCategory Update successfully'
-            });
+      res.status(200).json({
+        status: true,
+        data: toCamelCase(result.rows[0]),
+        message: 'Subcategory updated successfully'
+      });
     } finally {
       client.release();
     }
@@ -135,7 +155,7 @@ exports.deleteSubcategory = async (req, res) => {
     try {
       const result = await client.query('DELETE FROM subcategory WHERE id = $1 RETURNING *', [id]);
       if (!result.rows.length) return res.status(404).json({ message: 'Subcategory not found' });
-      res.json({ message: 'Subcategory deleted successfully' });
+      res.status(200).json({ message: 'Subcategory deleted successfully' });
     } finally {
       client.release();
     }
@@ -144,4 +164,3 @@ exports.deleteSubcategory = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-    
