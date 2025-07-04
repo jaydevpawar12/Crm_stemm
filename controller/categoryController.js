@@ -38,7 +38,7 @@ exports.getAllCategories = async (req, res) => {
       // res.json(result.rows);
       res.status(201).json({
         status: true,
-        data: { dataList: result.rows[0] },
+        data: { dataList: result.rows },
         message: 'category fetch successfully'
       });
     } finally {
