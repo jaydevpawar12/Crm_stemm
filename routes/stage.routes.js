@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const stageController = require('../controllers/stageController');
+const stageController = require('../controller/stageController');
 
 router.post('/', stageController.createStage);
 router.get('/', stageController.getAllStages);
