@@ -623,3 +623,83 @@ exports.deleteCustomer = async (req, res) => {
     res.status(500).json({ error: 'Failed to connect to database', details: err.message });
   }
 };
+
+exports.assignMultipleCustomersToUser = async (req, res) => {
+  const { userId, customerIds } = req.body;
+
+  // Validate required fields
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+  if (!customerIds || !Array.isArray(customerIds) || customerIds.length === 0) {
+    return res.status(400).json({ error: 'customerIds must be a non-empty array' });
+  }
+
+  // Validate UUIDs
+  if (!isUUID(userId)) return res.status(400).json({ error: 'Invalid userId: Must be a valid UUID' });
+  for (const customerId of customerIds) {
+    if (!isUUID(customerId)) {
+      return res.status(400).json({ error: `Invalid customerId: ${customerId} is not a valid UUID` });
+    }
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      // Validate user exists
+      const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [userId]);
+      if (userCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid userId: User does not exist' });
+      }
+
+      // Validate all customerIds exist
+      const customerCheck = await client.query(
+        'SELECT id FROM customers WHERE id = ANY($1::uuid[])',
+        [customerIds]
+      );
+      const foundCustomerIds = customerCheck.rows.map(row => row.id);
+      const missingIds = customerIds.filter(id => !foundCustomerIds.includes(id));
+      if (missingIds.length > 0) {
+        return res.status(400).json({ error: `Invalid customerIds: ${missingIds.join(', ')} do not exist` });
+      }
+
+      // Update assigned_to_id for all specified customers and include additional details
+      const result = await client.query(
+        `
+        UPDATE customers 
+        SET assigned_to_id = $1 
+        WHERE id = ANY($2::uuid[])
+        RETURNING 
+          id, name, email, phone, address, website, created_by, 
+          company_id, location_address, location_lat, location_long, 
+          location_name, customer_code, assigned_to_id, image_url, 
+          dial_code, country_code, company_name, tags, category,
+          (SELECT name FROM users WHERE id = customers.assigned_to_id) AS assigned_to_name,
+          (SELECT name FROM users WHERE id = customers.created_by) AS created_by_name
+        `,
+        [userId, customerIds]
+      );
+
+      // Convert snake_case to camelCase for the response data
+      const camelCaseData = result.rows.map(row => toCamelCase(row));
+
+      res.status(200).json({
+        status: true,
+        data: camelCaseData,
+        message: 'Customers assigned successfully'
+      });
+    } catch (err) {
+      console.error('Assign multiple customers error:', err.stack);
+      if (err.code === '23503') {
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'Foreign key constraint violation' });
+      }
+      if (err.code === '22P02') {
+        return res.status(400).json({ error: 'Invalid UUID format', details: err.message });
+      }
+      res.status(500).json({ error: 'Failed to assign customers', details: err.message });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database', details: err.message });
+  }
+};

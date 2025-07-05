@@ -16,12 +16,14 @@ const toCamelCase = (obj) => {
     if (camelKey === 'createdat') camelKey = 'createdAt';
     if (camelKey === 'updatedon') camelKey = 'updatedOn';
     if (camelKey === 'leadname') camelKey = 'leadName';
-    if (camelKey === 'subcategory') camelKey = 'subCategory';
     if (camelKey === 'isclose') camelKey = 'isClose';
     if (camelKey === 'iscompleted') camelKey = 'isCompleted';
     if (camelKey === 'isdeal') camelKey = 'isDeal';
     if (camelKey === 'companyid') camelKey = 'companyId';
     if (camelKey === 'closingdate') camelKey = 'closingDate';
+    if (camelKey === 'categoryid') camelKey = 'categoryId';
+    if (camelKey === 'stageid') camelKey = 'stageId';
+    if (camelKey === 'subcategoryid') camelKey = 'subcategoryId';
     newObj[camelKey] = obj[key];
   }
   return newObj;
@@ -36,8 +38,9 @@ exports.createLead = async (req, res) => {
     notes,
     leadName,
     updatedById,
-    stage,
-    subCategory,
+    categoryId,
+    stageId,
+    subcategoryId,
     isClose = false,
     isCompleted = false,
     phone,
@@ -55,6 +58,15 @@ exports.createLead = async (req, res) => {
   }
   if (updatedById && !isUUID(updatedById)) {
     return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
+  }
+  if (categoryId && !isUUID(categoryId)) {
+    return res.status(400).json({ error: 'Invalid categoryId: Must be a valid UUID' });
+  }
+  if (stageId && !isUUID(stageId)) {
+    return res.status(400).json({ error: 'Invalid stageId: Must be a valid UUID' });
+  }
+  if (subcategoryId && !isUUID(subcategoryId)) {
+    return res.status(400).json({ error: 'Invalid subcategoryId: Must be a valid UUID' });
   }
 
   // Validate phone format if provided
@@ -97,16 +109,34 @@ exports.createLead = async (req, res) => {
           return res.status(400).json({ error: 'Invalid updatedById: User does not exist' });
         }
       }
+      if (categoryId) {
+        const categoryCheck = await client.query('SELECT 1 FROM category WHERE id = $1', [categoryId]);
+        if (categoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid categoryId: Category does not exist' });
+        }
+      }
+      if (stageId) {
+        const stageCheck = await client.query('SELECT 1 FROM stage WHERE id = $1', [stageId]);
+        if (stageCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid stageId: Stage does not exist' });
+        }
+      }
+      if (subcategoryId) {
+        const subcategoryCheck = await client.query('SELECT 1 FROM subcategory WHERE id = $1', [subcategoryId]);
+        if (subcategoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid subcategoryId: Subcategory does not exist' });
+        }
+      }
 
       const result = await client.query(
         `INSERT INTO leads (
-          customerId, source, status, assignedTo, notes, leadName, updatedById,
-          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId, closingDate
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          customerid, source, status, assignedto, notes, leadname, updatedbyid,
+          categoryid, stageid, subcategoryid, isclose, iscompleted, phone, isdeal, companyid, closingdate
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING *`,
         [
           customerId, source, status, assignedTo, notes, leadName, updatedById,
-          stage, subCategory, isClose, isCompleted, phone, isDeal, companyId, closingDate
+          categoryId, stageId, subcategoryId, isClose, isCompleted, phone, isDeal, companyId, closingDate
         ]
       );
 
@@ -148,7 +178,9 @@ exports.getAllLeads = async (req, res) => {
         assignedTo,
         updatedById,
         status,
-        stage,
+        categoryId,
+        stageId,
+        subcategoryId,
         companyId,
         search,
         page = 1,
@@ -166,6 +198,15 @@ exports.getAllLeads = async (req, res) => {
       }
       if (updatedById && !isUUID(updatedById)) {
         return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
+      }
+      if (categoryId && !isUUID(categoryId)) {
+        return res.status(400).json({ error: 'Invalid categoryId: Must be a valid UUID' });
+      }
+      if (stageId && !isUUID(stageId)) {
+        return res.status(400).json({ error: 'Invalid stageId: Must be a valid UUID' });
+      }
+      if (subcategoryId && !isUUID(subcategoryId)) {
+        return res.status(400).json({ error: 'Invalid subcategoryId: Must be a valid UUID' });
       }
 
       // Validate companyId
@@ -199,34 +240,40 @@ exports.getAllLeads = async (req, res) => {
 
       const offset = (pageNum - 1) * limitNum;
 
-      // Base query
+      // Base query with joins to get names for categoryId, stageId, and subcategoryId
       let query = `
         SELECT 
           leads.*,
           u1.name AS assignedto_name,
           u2.name AS updatedby_name,
-          c.name AS customer_name
+          c.name AS customer_name,
+          cat.name AS category_name,
+          st.name AS stage_name,
+          subcat.name AS subcategory_name
         FROM leads
-        LEFT JOIN users u1 ON leads.assignedTo = u1.id
-        LEFT JOIN users u2 ON leads.updatedById = u2.id
-        LEFT JOIN customers c ON leads.customerId = c.id
+        LEFT JOIN users u1 ON leads.assignedto = u1.id
+        LEFT JOIN users u2 ON leads.updatedbyid = u2.id
+        LEFT JOIN customers c ON leads.customerid = c.id
+        LEFT JOIN category cat ON leads.categoryid = cat.id
+        LEFT JOIN stage st ON leads.stageid = st.id
+        LEFT JOIN subcategory subcat ON leads.subcategoryid = subcat.id
         WHERE 1=1
       `;
       const values = [];
       let paramIndex = 1;
 
       if (customerId) {
-        query += ` AND leads.customerId = $${paramIndex}::uuid`;
+        query += ` AND leads.customerid = $${paramIndex}::uuid`;
         values.push(customerId);
         paramIndex++;
       }
       if (assignedTo) {
-        query += ` AND leads.assignedTo = $${paramIndex}::uuid`;
+        query += ` AND leads.assignedto = $${paramIndex}::uuid`;
         values.push(assignedTo);
         paramIndex++;
       }
       if (updatedById) {
-        query += ` AND leads.updatedById = $${paramIndex}::uuid`;
+        query += ` AND leads.updatedbyid = $${paramIndex}::uuid`;
         values.push(updatedById);
         paramIndex++;
       }
@@ -235,34 +282,44 @@ exports.getAllLeads = async (req, res) => {
         values.push(status);
         paramIndex++;
       }
-      if (stage) {
-        query += ` AND leads.stage = $${paramIndex}`;
-        values.push(stage);
+      if (categoryId) {
+        query += ` AND leads.categoryid = $${paramIndex}::uuid`;
+        values.push(categoryId);
+        paramIndex++;
+      }
+      if (stageId) {
+        query += ` AND leads.stageid = $${paramIndex}::uuid`;
+        values.push(stageId);
+        paramIndex++;
+      }
+      if (subcategoryId) {
+        query += ` AND leads.subcategoryid = $${paramIndex}::uuid`;
+        values.push(subcategoryId);
         paramIndex++;
       }
       if (companyId) {
-        query += ` AND leads.companyId = $${paramIndex}`;
+        query += ` AND leads.companyid = $${paramIndex}`;
         values.push(companyId);
         paramIndex++;
       }
       if (search) {
-        query += ` AND LOWER(leads.leadName) LIKE LOWER($${paramIndex})`;
+        query += ` AND LOWER(leads.leadname) LIKE LOWER($${paramIndex})`;
         values.push(`%${search.trim()}%`);
         paramIndex++;
       }
       if (closingDateFrom) {
-        query += ` AND leads.closingDate >= $${paramIndex}`;
+        query += ` AND leads.closingdate >= $${paramIndex}`;
         values.push(closingDateFrom);
         paramIndex++;
       }
       if (closingDateTo) {
-        query += ` AND leads.closingDate <= $${paramIndex}`;
+        query += ` AND leads.closingdate <= $${paramIndex}`;
         values.push(closingDateTo);
         paramIndex++;
       }
 
       // Add pagination
-      query += ` ORDER BY leads.createdAt DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      query += ` ORDER BY leads.createdat DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       values.push(limitNum, offset);
 
       // Total count query
@@ -271,17 +328,17 @@ exports.getAllLeads = async (req, res) => {
       let countIndex = 1;
 
       if (customerId) {
-        countQuery += ` AND customerId = $${countIndex}::uuid`;
+        countQuery += ` AND customerid = $${countIndex}::uuid`;
         countValues.push(customerId);
         countIndex++;
       }
       if (assignedTo) {
-        countQuery += ` AND assignedTo = $${countIndex}::uuid`;
+        countQuery += ` AND assignedto = $${countIndex}::uuid`;
         countValues.push(assignedTo);
         countIndex++;
       }
       if (updatedById) {
-        countQuery += ` AND updatedById = $${countIndex}::uuid`;
+        countQuery += ` AND updatedbyid = $${countIndex}::uuid`;
         countValues.push(updatedById);
         countIndex++;
       }
@@ -290,28 +347,38 @@ exports.getAllLeads = async (req, res) => {
         countValues.push(status);
         countIndex++;
       }
-      if (stage) {
-        countQuery += ` AND stage = $${countIndex}`;
-        countValues.push(stage);
+      if (categoryId) {
+        countQuery += ` AND categoryid = $${countIndex}::uuid`;
+        countValues.push(categoryId);
+        countIndex++;
+      }
+      if (stageId) {
+        countQuery += ` AND stageid = $${countIndex}::uuid`;
+        countValues.push(stageId);
+        countIndex++;
+      }
+      if (subcategoryId) {
+        countQuery += ` AND subcategoryid = $${countIndex}::uuid`;
+        countValues.push(subcategoryId);
         countIndex++;
       }
       if (companyId) {
-        countQuery += ` AND companyId = $${countIndex}`;
+        countQuery += ` AND companyid = $${countIndex}`;
         countValues.push(companyId);
         countIndex++;
       }
       if (search) {
-        countQuery += ` AND LOWER(leadName) LIKE LOWER($${countIndex})`;
+        countQuery += ` AND LOWER(leadname) LIKE LOWER($${countIndex})`;
         countValues.push(`%${search.trim()}%`);
         countIndex++;
       }
       if (closingDateFrom) {
-        countQuery += ` AND closingDate >= $${countIndex}`;
+        countQuery += ` AND closingdate >= $${countIndex}`;
         countValues.push(closingDateFrom);
         countIndex++;
       }
       if (closingDateTo) {
-        countQuery += ` AND closingDate <= $${countIndex}`;
+        countQuery += ` AND closingdate <= $${countIndex}`;
         countValues.push(closingDateTo);
         countIndex++;
       }
@@ -369,13 +436,19 @@ exports.getLeadsByCompanyId = async (req, res) => {
           leads.*,
           u1.name AS assignedto_name,
           u2.name AS updatedby_name,
-          c.name AS customer_name
+          c.name AS customer_name,
+          cat.name AS category_name,
+          st.name AS stage_name,
+          subcat.name AS subcategory_name
         FROM leads
-        LEFT JOIN users u1 ON leads.assignedTo = u1.id
-        LEFT JOIN users u2 ON leads.updatedById = u2.id
-        LEFT JOIN customers c ON leads.customerId = c.id
-        WHERE leads.companyId = $1
-        ORDER BY leads.createdAt DESC
+        LEFT JOIN users u1 ON leads.assignedto = u1.id
+        LEFT JOIN users u2 ON leads.updatedbyid = u2.id
+        LEFT JOIN customers c ON leads.customerid = c.id
+        LEFT JOIN category cat ON leads.categoryid = cat.id
+        LEFT JOIN stage st ON leads.stageid = st.id
+        LEFT JOIN subcategory subcat ON leads.subcategoryid = subcat.id
+        WHERE leads.companyid = $1
+        ORDER BY leads.createdat DESC
         `,
         [companyId]
       );
@@ -417,11 +490,17 @@ exports.getLeadById = async (req, res) => {
           leads.*,
           u1.name AS assignedto_name,
           u2.name AS updatedby_name,
-          c.name AS customer_name
+          c.name AS customer_name,
+          cat.name AS category_name,
+          st.name AS stage_name,
+          subcat.name AS subcategory_name
         FROM leads
-        LEFT JOIN users u1 ON leads.assignedTo = u1.id
-        LEFT JOIN users u2 ON leads.updatedById = u2.id
-        LEFT JOIN customers c ON leads.customerId = c.id
+        LEFT JOIN users u1 ON leads.assignedto = u1.id
+        LEFT JOIN users u2 ON leads.updatedbyid = u2.id
+        LEFT JOIN customers c ON leads.customerid = c.id
+        LEFT JOIN category cat ON leads.categoryid = cat.id
+        LEFT JOIN stage st ON leads.stageid = st.id
+        LEFT JOIN subcategory subcat ON leads.subcategoryid = subcat.id
         WHERE leads.id = $1
         `,
         [id]
@@ -461,8 +540,9 @@ exports.updateLead = async (req, res) => {
     leadName,
     updatedById,
     updatedOn,
-    stage,
-    subCategory,
+    categoryId,
+    stageId,
+    subcategoryId,
     isClose,
     isCompleted,
     phone,
@@ -480,6 +560,15 @@ exports.updateLead = async (req, res) => {
   }
   if (updatedById && !isUUID(updatedById)) {
     return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
+  }
+  if (categoryId && !isUUID(categoryId)) {
+    return res.status(400).json({ error: 'Invalid categoryId: Must be a valid UUID' });
+  }
+  if (stageId && !isUUID(stageId)) {
+    return res.status(400).json({ error: 'Invalid stageId: Must be a valid UUID' });
+  }
+  if (subcategoryId && !isUUID(subcategoryId)) {
+    return res.status(400).json({ error: 'Invalid subcategoryId: Must be a valid UUID' });
   }
   if (!isUUID(id)) {
     return res.status(400).json({ error: 'Invalid id: Must be a valid UUID' });
@@ -525,18 +614,36 @@ exports.updateLead = async (req, res) => {
           return res.status(400).json({ error: 'Invalid updatedById: User does not exist' });
         }
       }
+      if (categoryId) {
+        const categoryCheck = await client.query('SELECT 1 FROM category WHERE id = $1', [categoryId]);
+        if (categoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid categoryId: Category does not exist' });
+        }
+      }
+      if (stageId) {
+        const stageCheck = await client.query('SELECT 1 FROM stage WHERE id = $1', [stageId]);
+        if (stageCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid stageId: Stage does not exist' });
+        }
+      }
+      if (subcategoryId) {
+        const subcategoryCheck = await client.query('SELECT 1 FROM subcategory WHERE id = $1', [subcategoryId]);
+        if (subcategoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid subcategoryId: Subcategory does not exist' });
+        }
+      }
 
       const result = await client.query(
         `UPDATE leads
-         SET customerId = $1, source = $2, status = $3, assignedTo = $4, notes = $5,
-             leadName = $6, updatedById = $7, updatedOn = $8, stage = $9, subCategory = $10,
-             isClose = $11, isCompleted = $12, phone = $13, isDeal = $14, companyId = $15,
-             closingDate = $16
-         WHERE id = $17 RETURNING *`,
+         SET customerid = $1, source = $2, status = $3, assignedto = $4, notes = $5,
+             leadname = $6, updatedbyid = $7, updatedon = $8, categoryid = $9, stageid = $10,
+             subcategoryid = $11, isclose = $12, iscompleted = $13, phone = $14, isdeal = $15,
+             companyid = $16, closingdate = $17
+         WHERE id = $18 RETURNING *`,
         [
           customerId, source, status, assignedTo, notes, leadName, updatedById,
-          updatedOn, stage, subCategory, isClose, isCompleted, phone, isDeal, companyId,
-          closingDate, id
+          updatedOn, categoryId, stageId, subcategoryId, isClose, isCompleted, phone, isDeal,
+          companyId, closingDate, id
         ]
       );
 
@@ -587,6 +694,15 @@ exports.patchLead = async (req, res) => {
   if (req.body.updatedById && !isUUID(req.body.updatedById)) {
     return res.status(400).json({ error: 'Invalid updatedById: Must be a valid UUID' });
   }
+  if (req.body.categoryId && !isUUID(req.body.categoryId)) {
+    return res.status(400).json({ error: 'Invalid categoryId: Must be a valid UUID' });
+  }
+  if (req.body.stageId && !isUUID(req.body.stageId)) {
+    return res.status(400).json({ error: 'Invalid stageId: Must be a valid UUID' });
+  }
+  if (req.body.subcategoryId && !isUUID(req.body.subcategoryId)) {
+    return res.status(400).json({ error: 'Invalid subcategoryId: Must be a valid UUID' });
+  }
   if (!isUUID(id)) {
     return res.status(400).json({ error: 'Invalid id: Must be a valid UUID' });
   }
@@ -603,7 +719,7 @@ exports.patchLead = async (req, res) => {
 
   // Validate closingDate format if provided
   if (req.body.closingDate) {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$/;
+    const dateRegex = /^\ east{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$/;
     if (!dateRegex.test(req.body.closingDate) || isNaN(Date.parse(req.body.closingDate))) {
       return res.status(400).json({ error: 'Invalid closingDate: Must be a valid ISO 8601 date (e.g., 2025-07-02T18:30:00Z)' });
     }
@@ -619,7 +735,7 @@ exports.patchLead = async (req, res) => {
           return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
         }
       }
-      if (req.body.assignedTo) {
+      if (req.body.ассignedTo) {
         const assignedCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [req.body.assignedTo]);
         if (assignedCheck.rows.length === 0) {
           return res.status(400).json({ error: 'Invalid assignedTo: User does not exist' });
@@ -631,6 +747,24 @@ exports.patchLead = async (req, res) => {
           return res.status(400).json({ error: 'Invalid updatedById: User does not exist' });
         }
       }
+      if (req.body.categoryId) {
+        const categoryCheck = await client.query('SELECT 1 FROM category WHERE id = $1', [req.body.categoryId]);
+        if (categoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid categoryId: Category does not exist' });
+        }
+      }
+      if (req.body.stageId) {
+        const stageCheck = await client.query('SELECT 1 FROM stage WHERE id = $1', [req.body.stageId]);
+        if (stageCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid stageId: Stage does not exist' });
+        }
+      }
+      if (req.body.subcategoryId) {
+        const subcategoryCheck = await client.query('SELECT 1 FROM subcategory WHERE id = $1', [req.body.subcategoryId]);
+        if (subcategoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid subcategoryId: Subcategory does not exist' });
+        }
+      }
 
       // Map camelCase to snake_case for database
       const snakeCaseFields = fields.map(([key, value]) => {
@@ -639,13 +773,15 @@ exports.patchLead = async (req, res) => {
         if (key === 'assignedTo') snakeKey = 'assignedto';
         if (key === 'updatedById') snakeKey = 'updatedbyid';
         if (key === 'leadName') snakeKey = 'leadname';
-        if (key === 'subCategory') snakeKey = 'subcategory';
         if (key === 'isClose') snakeKey = 'isclose';
         if (key === 'isCompleted') snakeKey = 'iscompleted';
         if (key === 'isDeal') snakeKey = 'isdeal';
         if (key === 'companyId') snakeKey = 'companyid';
         if (key === 'updatedOn') snakeKey = 'updatedon';
         if (key === 'closingDate') snakeKey = 'closingdate';
+        if (key === 'categoryId') snakeKey = 'categoryid';
+        if (key === 'stageId') snakeKey = 'stageid';
+        if (key === 'subcategoryId') snakeKey = 'subcategoryid';
         return [snakeKey, value];
       });
 
@@ -720,3 +856,4 @@ exports.deleteLead = async (req, res) => {
     res.status(500).json({ error: 'Failed to connect to database' });
   }
 };
+
