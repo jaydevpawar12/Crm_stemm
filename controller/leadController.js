@@ -226,7 +226,7 @@ exports.getAllLeads = async (req, res) => {
         return res.status(400).json({ error: 'Invalid closingDateFrom: Must be a valid ISO 8601 date (e.g., 2025-07-02 or 2025-07-02T00:00:00Z)' });
       }
       if (closingDateTo && (!dateRegex.test(closingDateTo) || isNaN(Date.parse(closingDateTo)))) {
-        return res.status(400).json({ error: 'Invalid closingDateTo: Must be a valid ISO 8601 date (e.g., 2025-07-02 or 2025-07-02T23:59:59Z)' });
+        return res.status(400).json({ error: 'Invalid closingDateTo: Must be a valid ISO 8601 date (e.g., 2025-07-02 or 2025-07-02👈23:59:59Z)' });
       }
 
       // Validate pagination inputs
@@ -239,9 +239,47 @@ exports.getAllLeads = async (req, res) => {
         return res.status(400).json({ error: 'Invalid limit: Must be a positive integer' });
       }
 
+      // Validate foreign keys
+      if (customerId) {
+        const customerCheck = await client.query('SELECT 1 FROM customers WHERE id = $1', [customerId]);
+        if (customerCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
+        }
+      }
+      if (assignedTo) {
+        const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [assignedTo]);
+        if (userCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid assignedTo: User does not exist' });
+        }
+      }
+      if (updatedById) {
+        const userCheck = await client.query('SELECT 1 FROM users WHERE id = $1', [updatedById]);
+        if (userCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid updatedById: User does not exist' });
+        }
+      }
+      if (categoryId) {
+        const categoryCheck = await client.query('SELECT 1 FROM category WHERE id = $1', [categoryId]);
+        if (categoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid categoryId: Category does not exist' });
+        }
+      }
+      if (stageId) {
+        const stageCheck = await client.query('SELECT 1 FROM stage WHERE id = $1', [stageId]);
+        if (stageCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid stageId: Stage does not exist' });
+        }
+      }
+      if (subcategoryId) {
+        const subcategoryCheck = await client.query('SELECT 1 FROM subcategory WHERE id = $1', [subcategoryId]);
+        if (subcategoryCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Invalid subcategoryId: Subcategory does not exist' });
+        }
+      }
+
       const offset = (pageNum - 1) * limitNum;
 
-      // Base query with joins to get names for categoryId, stageId, and subcategoryId
+      // Base query with joins
       let query = `
         SELECT 
           leads.*,
@@ -250,7 +288,7 @@ exports.getAllLeads = async (req, res) => {
           c.name AS customer_name,
           cat.name AS category_name,
           st.name AS stage_name,
-          subcat.name AS subcategoryname
+          subcat.name AS subcategory_name
         FROM leads
         LEFT JOIN users u1 ON leads.assignedto = u1.id
         LEFT JOIN users u2 ON leads.updatedbyid = u2.id
@@ -263,6 +301,7 @@ exports.getAllLeads = async (req, res) => {
       const values = [];
       let paramIndex = 1;
 
+      // Dynamic filtering with AND conditions
       if (customerId) {
         query += ` AND leads.customerid = $${paramIndex}::uuid`;
         values.push(customerId);
@@ -398,25 +437,30 @@ exports.getAllLeads = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: { dataList: camelCaseRows },
-        page: pageNum,
-        limit: limitNum,
-        totalCount,
-        totalPages,
-        message: "Leads fetched successfully"
+        data: {
+          dataList: camelCaseRows,
+          totalCount,
+          page: pageNum,
+          limit: limitNum,
+          totalPages
+        },
+        message: 'Leads fetched successfully'
       });
     } catch (err) {
       console.error('Get leads error:', err.stack);
+      if (err.code === '22P02') {
+        return res.status(400).json({ error: 'Invalid UUID format', details: err.message });
+      }
       if (err.code === '22007') {
         return res.status(400).json({ error: 'Invalid date format in query parameters', details: err.message });
       }
-      res.status(500).json({ error: 'Internal server error', details: err.message });
+      res.status(500).json({ error: 'Failed to fetch leads', details: err.message });
     } finally {
       client.release();
     }
   } catch (err) {
     console.error('Database connection error:', err.stack);
-    res.status(500).json({ error: 'Failed to connect to database' });
+    res.status(500).json({ error: 'Failed to connect to database', details: err.message });
   }
 };
 
