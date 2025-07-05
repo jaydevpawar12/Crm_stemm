@@ -23,7 +23,8 @@ const toCamelCase = (obj) => {
     if (camelKey === 'closingdate') camelKey = 'closingDate';
     if (camelKey === 'categoryid') camelKey = 'categoryId';
     if (camelKey === 'stageid') camelKey = 'stageId';
-    if (camelKey === 'subcategoryid') camelKey = 'subcategoryId';
+    if (camelKey === 'subcategoryname') camelKey = 'subCategoryName';
+    if (camelKey === 'subcategoryid') camelKey = 'subCategoryId';   
     newObj[camelKey] = obj[key];
   }
   return newObj;
@@ -249,7 +250,7 @@ exports.getAllLeads = async (req, res) => {
           c.name AS customer_name,
           cat.name AS category_name,
           st.name AS stage_name,
-          subcat.name AS subcategory_name
+          subcat.name AS subcategoryname
         FROM leads
         LEFT JOIN users u1 ON leads.assignedto = u1.id
         LEFT JOIN users u2 ON leads.updatedbyid = u2.id
