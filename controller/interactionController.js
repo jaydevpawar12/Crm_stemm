@@ -20,6 +20,7 @@ const toCamelCase = (obj) => {
     if (camelKey === 'leadId') camelKey = 'leadId';
     if (camelKey === 'interactionType') camelKey = 'interactionType';
     if (camelKey === 'interactionDate') camelKey = 'interactionDate';
+    if (camelKey === 'attachmentType') camelKey = 'attachmentType';
     newObj[camelKey] = obj[key];
   }
   return newObj;
@@ -34,7 +35,8 @@ exports.createInteraction = async (req, res) => {
     companyId,
     interactionDate,
     createdBy,
-    attachments
+    attachments,
+    attachmentType
   } = req.body;
 
   // Validate required fields
@@ -47,6 +49,11 @@ exports.createInteraction = async (req, res) => {
   // Validate attachments
   if (attachments && (!Array.isArray(attachments) || !attachments.every(item => typeof item === 'string'))) {
     return res.status(400).json({ error: 'Invalid attachments: Must be an array of strings' });
+  }
+
+  // Validate attachmentType
+  if (attachmentType && typeof attachmentType !== 'string') {
+    return res.status(400).json({ error: 'Invalid attachmentType: Must be a string' });
   }
 
   // Validate interactionDate if provided
@@ -73,10 +80,10 @@ exports.createInteraction = async (req, res) => {
 
       const result = await client.query(
         `INSERT INTO interactions (
-           lead_id, interaction_type, notes, companyId, interaction_date, created_by, attachments
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+           lead_id, interaction_type, notes, companyId, interaction_date, created_by, attachments, attachment_type
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [leadId, interactionType, notes, companyId, interactionDate || new Date(), createdBy, attachments]
+        [leadId, interactionType, notes, companyId, interactionDate || new Date(), createdBy, attachments, attachmentType]
       );
 
       // Convert snake_case to camelCase
@@ -107,7 +114,7 @@ exports.createInteraction = async (req, res) => {
 
 // Get All Interactions
 exports.getAllInteractions = async (req, res) => {
-  const { leadId, companyId, createdBy, interactionType, interactionDateFrom, interactionDateTo, page = 1, limit = 10 } = req.query;
+  const { leadId, companyId, createdBy, interactionType, attachmentType, interactionDateFrom, interactionDateTo, page = 1, limit = 10 } = req.query;
 
   // Validate page and limit
   const pageNum = parseInt(page, 10);
@@ -135,6 +142,11 @@ exports.getAllInteractions = async (req, res) => {
   // Validate interactionType
   if (interactionType && typeof interactionType !== 'string') {
     return res.status(400).json({ error: 'Invalid interactionType: Must be a string' });
+  }
+
+  // Validate attachmentType
+  if (attachmentType && typeof attachmentType !== 'string') {
+    return res.status(400).json({ error: 'Invalid attachmentType: Must be a string' });
   }
 
   // Validate interactionDateFrom and interactionDateTo
@@ -216,6 +228,11 @@ exports.getAllInteractions = async (req, res) => {
         values.push(interactionType);
         paramCount++;
       }
+      if (attachmentType) {
+        conditions.push(`i.attachment_type = $${paramCount}`);
+        values.push(attachmentType);
+        paramCount++;
+      }
       if (interactionDateFrom) {
         conditions.push(`i.interaction_date >= $${paramCount}`);
         values.push(interactionDateFrom);
@@ -279,7 +296,7 @@ exports.getAllInteractions = async (req, res) => {
   }
 };
 
-// Get Interaction by ID
+// Get Interaction By ID
 exports.getInteractionById = async (req, res) => {
   const { id } = req.params;
 
@@ -335,7 +352,8 @@ exports.updateInteraction = async (req, res) => {
     companyId,
     interactionDate,
     createdBy,
-    attachments
+    attachments,
+    attachmentType
   } = req.body;
 
   // Validate required fields
@@ -349,6 +367,11 @@ exports.updateInteraction = async (req, res) => {
   // Validate attachments
   if (attachments && (!Array.isArray(attachments) || !attachments.every(item => typeof item === 'string'))) {
     return res.status(400).json({ error: 'Invalid attachments: Must be an array of strings' });
+  }
+
+  // Validate attachmentType
+  if (attachmentType && typeof attachmentType !== 'string') {
+    return res.status(400).json({ error: 'Invalid attachmentType: Must be a string' });
   }
 
   // Validate interactionDate if provided
@@ -382,11 +405,12 @@ exports.updateInteraction = async (req, res) => {
           companyId = $4,
           interaction_date = $5,
           created_by = $6,
-          attachments = $7
-        WHERE id = $8
+          attachments = $7,
+          attachment_type = $8
+        WHERE id = $9
         RETURNING *
         `,
-        [leadId, interactionType, notes, companyId, interactionDate || new Date(), createdBy, attachments, id]
+        [leadId, interactionType, notes, companyId, interactionDate || new Date(), createdBy, attachments, attachmentType, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Interaction not found' });
 
@@ -426,7 +450,8 @@ exports.patchInteraction = async (req, res) => {
     companyId,
     interactionDate,
     createdBy,
-    attachments
+    attachments,
+    attachmentType
   } = req.body;
 
   // Validate UUID fields
@@ -437,6 +462,11 @@ exports.patchInteraction = async (req, res) => {
   // Validate attachments
   if (attachments && (!Array.isArray(attachments) || !attachments.every(item => typeof item === 'string'))) {
     return res.status(400).json({ error: 'Invalid attachments: Must be an array of strings' });
+  }
+
+  // Validate attachmentType
+  if (attachmentType && typeof attachmentType !== 'string') {
+    return res.status(400).json({ error: 'Invalid attachmentType: Must be a string' });
   }
 
   // Validate interactionDate if provided
@@ -505,6 +535,11 @@ exports.patchInteraction = async (req, res) => {
       if (attachments !== undefined) {
         setClauses.push(`attachments = $${paramCount}`);
         values.push(attachments);
+        paramCount++;
+      }
+      if (attachmentType !== undefined) {
+        setClauses.push(`attachment_type = $${paramCount}`);
+        values.push(attachmentType);
         paramCount++;
       }
 
