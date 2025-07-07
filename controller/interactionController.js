@@ -107,7 +107,7 @@ exports.createInteraction = async (req, res) => {
 
 // Get All Interactions
 exports.getAllInteractions = async (req, res) => {
-  const { leadId, companyId, createdBy, page = 1, limit = 10 } = req.query;
+  const { leadId, companyId, createdBy, interactionDateFrom, interactionDateTo, page = 1, limit = 10 } = req.query;
 
   // Validate page and limit
   const pageNum = parseInt(page, 10);
@@ -127,14 +127,43 @@ exports.getAllInteractions = async (req, res) => {
     return res.status(400).json({ error: 'Invalid createdBy: Must be a valid UUID' });
   }
 
+  // Validate companyId
+  if (companyId && !companyId.trim()) {
+    return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
+  // Validate interactionDateFrom and interactionDateTo
+  const dateRegex = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?)?$/;
+  if (interactionDateFrom && (!dateRegex.test(interactionDateFrom) || isNaN(Date.parse(interactionDateFrom)))) {
+    return res.status(400).json({ error: 'Invalid interactionDateFrom: Must be a valid ISO 8601 date (e.g., 2025-07-02 or 2025-07-02T00:00:00Z)' });
+  }
+  if (interactionDateTo && (!dateRegex.test(interactionDateTo) || isNaN(Date.parse(interactionDateTo)))) {
+    return res.status(400).json({ error: 'Invalid interactionDateTo: Must be a valid ISO 8601 date (e.g., 2025-07-02 or 2025-07-02T23:59:59Z)' });
+  }
+
   try {
     const client = await pool.connect();
     try {
-      // Validate leadId exists if provided
-      if (leadId) {
-        const leadCheck = await client.query('SELECT 1 FROM leads WHERE id = $1', [leadId]);
+      // Validate leadId and companyId combination exists in leads table if both provided
+      if (leadId || companyId) {
+        let leadCheckQuery = 'SELECT 1 FROM leads WHERE 1=1';
+        let leadCheckValues = [];
+        let paramIndex = 1;
+
+        if (leadId) {
+          leadCheckQuery += ` AND id = $${paramIndex}::uuid`;
+          leadCheckValues.push(leadId);
+          paramIndex++;
+        }
+        if (companyId) {
+          leadCheckQuery += ` AND companyid = $${paramIndex}`;
+          leadCheckValues.push(companyId);
+          paramIndex++;
+        }
+
+        const leadCheck = await client.query(leadCheckQuery, leadCheckValues);
         if (leadCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Invalid leadId: Lead does not exist' });
+          return res.status(400).json({ error: 'Invalid leadId or companyId: No matching lead found' });
         }
       }
 
@@ -155,6 +184,8 @@ exports.getAllInteractions = async (req, res) => {
           u.name AS created_by_name
         FROM interactions i
         LEFT JOIN users u ON i.created_by = u.id
+        LEFT JOIN leads l ON i.lead_id = l.id
+        WHERE 1=1
       `;
       let conditions = [];
       let values = [];
@@ -175,9 +206,19 @@ exports.getAllInteractions = async (req, res) => {
         values.push(createdBy);
         paramCount++;
       }
+      if (interactionDateFrom) {
+        conditions.push(`i.interaction_date >= $${paramCount}`);
+        values.push(interactionDateFrom);
+        paramCount++;
+      }
+      if (interactionDateTo) {
+        conditions.push(`i.interaction_date <= $${paramCount}`);
+        values.push(interactionDateTo);
+        paramCount++;
+      }
 
       if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ');
+        query += ' AND ' + conditions.join(' AND ');
       }
 
       query += ` ORDER BY i.interaction_date DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
@@ -214,6 +255,9 @@ exports.getAllInteractions = async (req, res) => {
       console.error('Get interactions error:', err.stack);
       if (err.code === '22P02') {
         return res.status(400).json({ error: 'Invalid UUID format', details: err.message });
+      }
+      if (err.code === '22007') {
+        return res.status(400).json({ error: 'Invalid date format in query parameters', details: err.message });
       }
       res.status(500).json({ error: 'Failed to fetch interactions', details: err.message });
     } finally {

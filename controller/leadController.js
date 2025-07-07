@@ -288,7 +288,7 @@ exports.getAllLeads = async (req, res) => {
           c.name AS customer_name,
           cat.name AS category_name,
           st.name AS stage_name,
-          subcat.name AS subcategory_name
+          subcat.name AS subCategoryName
         FROM leads
         LEFT JOIN users u1 ON leads.assignedto = u1.id
         LEFT JOIN users u2 ON leads.updatedbyid = u2.id
