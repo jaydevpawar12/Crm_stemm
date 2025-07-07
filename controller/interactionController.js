@@ -107,7 +107,7 @@ exports.createInteraction = async (req, res) => {
 
 // Get All Interactions
 exports.getAllInteractions = async (req, res) => {
-  const { leadId, companyId, createdBy, interactionDateFrom, interactionDateTo, page = 1, limit = 10 } = req.query;
+  const { leadId, companyId, createdBy, interactionType, interactionDateFrom, interactionDateTo, page = 1, limit = 10 } = req.query;
 
   // Validate page and limit
   const pageNum = parseInt(page, 10);
@@ -132,6 +132,11 @@ exports.getAllInteractions = async (req, res) => {
     return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
   }
 
+  // Validate interactionType
+  if (interactionType && typeof interactionType !== 'string') {
+    return res.status(400).json({ error: 'Invalid interactionType: Must be a string' });
+  }
+
   // Validate interactionDateFrom and interactionDateTo
   const dateRegex = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?)?$/;
   if (interactionDateFrom && (!dateRegex.test(interactionDateFrom) || isNaN(Date.parse(interactionDateFrom)))) {
@@ -144,7 +149,7 @@ exports.getAllInteractions = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      // Validate leadId and companyId combination exists in leads table if both provided
+      // Validate leadId and companyId combination exists in leads table if either is provided
       if (leadId || companyId) {
         let leadCheckQuery = 'SELECT 1 FROM leads WHERE 1=1';
         let leadCheckValues = [];
@@ -204,6 +209,11 @@ exports.getAllInteractions = async (req, res) => {
       if (createdBy) {
         conditions.push(`i.created_by = $${paramCount}::uuid`);
         values.push(createdBy);
+        paramCount++;
+      }
+      if (interactionType) {
+        conditions.push(`i.interaction_type = $${paramCount}`);
+        values.push(interactionType);
         paramCount++;
       }
       if (interactionDateFrom) {
