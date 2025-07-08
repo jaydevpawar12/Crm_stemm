@@ -21,7 +21,6 @@ const toCamelCase = (obj) => {
     if (camelKey === 'interactionType') camelKey = 'interactionType';
     if (camelKey === 'interactionDate') camelKey = 'interactionDate';
     if (camelKey === 'attachmentType') camelKey = 'attachmentType';
-    if (camelKey === 'createdAt') camelKey = 'createdAt'; // Added for new column
     newObj[camelKey] = obj[key];
   }
   return newObj;
@@ -81,8 +80,8 @@ exports.createInteraction = async (req, res) => {
 
       const result = await client.query(
         `INSERT INTO interactions (
-           lead_id, interaction_type, notes, companyId, interaction_date, created_by, attachments, attachment_type, created_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+           lead_id, interaction_type, notes, companyId, interaction_date, created_by, attachments, attachment_type
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [leadId, interactionType, notes, companyId, interactionDate || new Date(), createdBy, attachments, attachmentType]
       );
@@ -249,7 +248,7 @@ exports.getAllInteractions = async (req, res) => {
         query += ' AND ' + conditions.join(' AND ');
       }
 
-      query += ` ORDER BY i.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+      query += ` ORDER BY i.interaction_date DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
       values.push(limitNum, offset);
 
       // Count query
@@ -307,6 +306,7 @@ exports.getInteractionById = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
+      
       const result = await client.query(
         `
         SELECT 
