@@ -9,7 +9,7 @@ const toCamelCase = (obj) => {
     camelKey = camelKey.replace(/^([A-Z])/, (match, letter) => letter.toLowerCase());
     // Explicit mappings for specific fields
     if (camelKey === 'createdBy') camelKey = 'createdBy';
-    if (camelKey === 'companyId') camelKey = 'companyId';
+    if (camelKey === 'companyid') camelKey = 'companyId';
     if (camelKey === 'companyName') camelKey = 'companyName';
     if (camelKey === 'assignedToName') camelKey = 'assignedToName';
     if (camelKey === 'createdByName') camelKey = 'createdByName';
@@ -306,7 +306,7 @@ exports.getInteractionById = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      
+
       const result = await client.query(
         `
         SELECT 

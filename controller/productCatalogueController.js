@@ -2,82 +2,97 @@ const validator = require('validator');
 const xss = require('xss');
 const { pool } = require('../db');
 
+// Utility function to convert snake_case to camelCase
+const toCamelCase = (obj) => {
+  if (Array.isArray(obj)) {
+    return obj.map(item => toCamelCase(item));
+  } else if (obj && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      acc[camelKey] = typeof obj[key] === 'object' && obj[key] !== null 
+        ? toCamelCase(obj[key]) 
+        : obj[key];
+      return acc;
+    }, {});
+  }
+  return obj;
+};
+
 // Create Product Catalogue
 exports.createProductCatalogue = async (req, res) => {
-  const { createdbyid, exporturl, image, cataloguename, companyid, productids } = req.body;
+  const { createdById, exportUrl, image, catalogueName, companyId, productIds } = req.body;
 
   // Input validation
-  if (!createdbyid || !cataloguename || !companyid || !productids) {
-    return res.status(400).json({ error: 'createdbyid, cataloguename, companyid, and productids are required' });
+  if (!createdById || !catalogueName || !companyId || !productIds) {
+    return res.status(400).json({ error: 'createdById, catalogueName, companyId, and productIds are required' });
   }
 
   // UUID validation
-  if (!validator.isUUID(createdbyid)) {
-    return res.status(400).json({ error: 'createdbyid must be a valid UUID' });
+  if (!validator.isUUID(createdById)) {
+    return res.status(400).json({ error: 'createdById must be a valid UUID' });
   }
 
   // String length validation
-  if (!validator.isLength(cataloguename, { min: 1, max: 255 })) {
-    return res.status(400).json({ error: 'cataloguename must be between 1 and 255 characters' });
+  if (!validator.isLength(catalogueName, { min: 1, max: 255 })) {
+    return res.status(400).json({ error: 'catalogueName must be between 1 and 255 characters' });
   }
-  if (!validator.isLength(companyid, { min: 1, max: 50 })) {
-    return res.status(400).json({ error: 'companyid must be between 1 and 50 characters' });
+  if (!validator.isLength(companyId, { min: 1, max: 50 })) {
+    return res.status(400).json({ error: 'companyId must be between 1 and 50 characters' });
   }
 
   // URL validation
-  if (exporturl && !validator.isURL(exporturl, { require_protocol: true })) {
-    return res.status(400).json({ error: 'exporturl must be a valid URL with protocol if provided' });
+  if (exportUrl && !validator.isURL(exportUrl, { require_protocol: true })) {
+    return res.status(400).json({ error: 'exportUrl must be a valid URL with protocol if provided' });
   }
   if (image && !validator.isURL(image, { require_protocol: true })) {
     return res.status(400).json({ error: 'image must be a valid URL with protocol if provided' });
   }
 
   // Product IDs validation
-  if (!Array.isArray(productids) || productids.length === 0) {
-    return res.status(400).json({ error: 'productids must be a non-empty array' });
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return res.status(400).json({ error: 'productIds must be a non-empty array' });
   }
-  for (const productid of productids) {
-    if (!validator.isUUID(productid)) {
-      return res.status(400).json({ error: `Invalid productid: ${productid} must be a valid UUID` });
+  for (const productId of productIds) {
+    if (!validator.isUUID(productId)) {
+      return res.status(400).json({ error: `Invalid productId: ${productId} must be a valid UUID` });
     }
   }
 
   // Sanitize inputs
-  const sanitizedCataloguename = xss(cataloguename.trim());
-  const sanitizedExporturl = exporturl ? xss(exporturl.trim()) : null;
+  const sanitizedCatalogueName = xss(catalogueName.trim());
+  const sanitizedExportUrl = exportUrl ? xss(exportUrl.trim()) : null;
   const sanitizedImage = image ? xss(image.trim()) : null;
-  const sanitizedCompanyid = xss(companyid.trim());
-  const sanitizedProductids = productids.map(id => xss(id.trim()));
+  const sanitizedCompanyId = xss(companyId.trim());
+  const sanitizedProductIds = productIds.map(id => xss(id.trim()));
 
   try {
     const client = await pool.connect();
     try {
-      // Start transaction
       await client.query('BEGIN');
 
-      // Verify createdbyid exists in users table
-      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdbyid]);
+      // Verify createdById exists in users table
+      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdById]);
       if (userCheck.rowCount === 0) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Invalid createdbyid: user does not exist' });
+        return res.status(400).json({ error: 'Invalid createdById: user does not exist' });
       }
 
-      // Verify productids exist in products table and belong to the same company
-      for (const productid of sanitizedProductids) {
+      // Verify productIds exist in products table and belong to the same company
+      for (const productId of sanitizedProductIds) {
         const productCheck = await client.query(
           'SELECT 1 FROM public.products WHERE id = $1 AND companyid = $2',
-          [productid, sanitizedCompanyid]
+          [productId, sanitizedCompanyId]
         );
         if (productCheck.rowCount === 0) {
           await client.query('ROLLBACK');
-          return res.status(400).json({ error: `Invalid productid: ${productid} does not exist or does not belong to company ${sanitizedCompanyid}` });
+          return res.status(400).json({ error: `Invalid productId: ${productId} does not exist or does not belong to company ${sanitizedCompanyId}` });
         }
       }
 
-      // Check for duplicate cataloguename for the same company
+      // Check for duplicate catalogueName for the same company
       const duplicateCheck = await client.query(
         'SELECT 1 FROM public.productcatalogues WHERE companyid = $1 AND cataloguename = $2',
-        [sanitizedCompanyid, sanitizedCataloguename]
+        [sanitizedCompanyId, sanitizedCatalogueName]
       );
       if (duplicateCheck.rowCount > 0) {
         await client.query('ROLLBACK');
@@ -88,21 +103,21 @@ exports.createProductCatalogue = async (req, res) => {
         `INSERT INTO public.productcatalogues (createdbyid, exporturl, image, cataloguename, companyid, productids)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, createdbyid, createdon, exporturl, image, cataloguename, companyid, productids`,
-        [createdbyid, sanitizedExporturl, sanitizedImage, sanitizedCataloguename, sanitizedCompanyid, sanitizedProductids]
+        [createdById, sanitizedExportUrl, sanitizedImage, sanitizedCatalogueName, sanitizedCompanyId, sanitizedProductIds]
       );
 
       await client.query('COMMIT');
 
       res.status(201).json({
         status: true,
-        data: result.rows[0],
+        data: toCamelCase(result.rows[0]),
         message: 'Product catalogue created successfully'
       });
     } catch (err) {
       await client.query('ROLLBACK');
       console.error('Create product catalogue error:', err.stack);
       if (err.code === '23503') {
-        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'createdbyid does not exist in users table' });
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'createdById does not exist in users table' });
       }
       if (err.code === '23505') {
         return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
@@ -119,7 +134,7 @@ exports.createProductCatalogue = async (req, res) => {
 
 // Get All Product Catalogues
 exports.getAllProductCatalogues = async (req, res) => {
-  const { companyid, search, page = 1, limit = 10 } = req.query;
+  const { companyId, search, page = 1, limit = 10, sortBy = 'createdOn', sortOrder = 'DESC', createdById, fromDate, toDate } = req.query;
 
   // Validate pagination parameters
   const pageNum = parseInt(page, 10);
@@ -131,19 +146,42 @@ exports.getAllProductCatalogues = async (req, res) => {
     return res.status(400).json({ error: 'limit must be a positive integer between 1 and 100' });
   }
 
-  // Search parameter validation
+  // Validate inputs
   if (search && !validator.isLength(search, { min: 1, max: 255 })) {
     return res.status(400).json({ error: 'search must be between 1 and 255 characters' });
   }
+  if (companyId && !validator.isLength(companyId, { min: 1, max: 50 })) {
+    return res.status(400).json({ error: 'companyId must be between 1 and 50 characters' });
+  }
+  if (createdById && !validator.isUUID(createdById)) {
+    return res.status(400).json({ error: 'createdById must be a valid UUID' });
+  }
+  if (fromDate && !validator.isISO8601(fromDate)) {
+    return res.status(400).json({ error: 'fromDate must be a valid ISO 8601 date' });
+  }
+  if (toDate && !validator.isISO8601(toDate)) {
+    return res.status(400).json({ error: 'toDate must be a valid ISO 8601 date' });
+  }
+  if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
+    return res.status(400).json({ error: 'fromDate cannot be later than toDate' });
+  }
 
-  // Company ID validation
-  if (companyid && !validator.isLength(companyid, { min: 1, max: 50 })) {
-    return res.status(400).json({ error: 'companyid must be between 1 and 50 characters' });
+  // Validate sort parameters
+  const validSortFields = ['createdOn', 'catalogueName'];
+  const validSortOrders = ['ASC', 'DESC'];
+  if (!validSortFields.includes(sortBy)) {
+    return res.status(400).json({ error: `sortBy must be one of: ${validSortFields.join(', ')}` });
+  }
+  if (!validSortOrders.includes(sortOrder.toUpperCase())) {
+    return res.status(400).json({ error: 'sortOrder must be either ASC or DESC' });
   }
 
   // Sanitize inputs
   const sanitizedSearch = search ? xss(search.trim()) : null;
-  const sanitizedCompanyid = companyid ? xss(companyid.trim()) : null;
+  const sanitizedCompanyId = companyId ? xss(companyId.trim()) : null;
+  const sanitizedCreatedById = createdById ? xss(createdById.trim()) : null;
+  const sanitizedSortBy = xss(sortBy.trim());
+  const sanitizedSortOrder = xss(sortOrder.trim().toUpperCase());
 
   try {
     const client = await pool.connect();
@@ -163,11 +201,11 @@ exports.getAllProductCatalogues = async (req, res) => {
       const countParams = [];
       let paramIndex = 1;
 
-      if (sanitizedCompanyid) {
+      if (sanitizedCompanyId) {
         query += ` AND pc.companyid = $${paramIndex}`;
         countQuery += ` AND companyid = $${paramIndex}`;
-        queryParams.push(sanitizedCompanyid);
-        countParams.push(sanitizedCompanyid);
+        queryParams.push(sanitizedCompanyId);
+        countParams.push(sanitizedCompanyId);
         paramIndex++;
       }
 
@@ -179,7 +217,31 @@ exports.getAllProductCatalogues = async (req, res) => {
         paramIndex++;
       }
 
-      query += ` ORDER BY pc.createdon DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      if (sanitizedCreatedById) {
+        query += ` AND pc.createdbyid = $${paramIndex}`;
+        countQuery += ` AND createdbyid = $${paramIndex}`;
+        queryParams.push(sanitizedCreatedById);
+        countParams.push(sanitizedCreatedById);
+        paramIndex++;
+      }
+
+      if (fromDate) {
+        query += ` AND pc.createdon >= $${paramIndex}`;
+        countQuery += ` AND createdon >= $${paramIndex}`;
+        queryParams.push(fromDate);
+        countParams.push(fromDate);
+        paramIndex++;
+      }
+
+      if (toDate) {
+        query += ` AND pc.createdon <= $${paramIndex}`;
+        countQuery += ` AND createdon <= $${paramIndex}`;
+        queryParams.push(toDate);
+        countParams.push(toDate);
+        paramIndex++;
+      }
+
+      query += ` ORDER BY pc.${sanitizedSortBy} ${sanitizedSortOrder} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       queryParams.push(limitNum, offset);
 
       const [result, countResult] = await Promise.all([
@@ -187,7 +249,7 @@ exports.getAllProductCatalogues = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      const dataList = result.rows;
+      const dataList = toCamelCase(result.rows);
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
@@ -243,7 +305,7 @@ exports.getProductCatalogueById = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: toCamelCase(result.rows[0]),
         message: 'Product catalogue fetched successfully'
       });
     } catch (err) {
@@ -264,78 +326,77 @@ exports.getProductCatalogueById = async (req, res) => {
 // Update Product Catalogue
 exports.updateProductCatalogue = async (req, res) => {
   const { id } = req.params;
-  const { createdbyid, exporturl, image, cataloguename, companyid, productids } = req.body;
+  const { createdById, exportUrl, image, catalogueName, companyId, productIds } = req.body;
 
   if (!validator.isUUID(id)) {
     return res.status(400).json({ error: 'id must be a valid UUID' });
   }
 
-  if (!createdbyid || !cataloguename || !companyid || !productids) {
-    return res.status(400).json({ error: 'createdbyid, cataloguename, companyid, and productids are required' });
+  if (!createdById || !catalogueName || !companyId || !productIds) {
+    return res.status(400).json({ error: 'createdById, catalogueName, companyId, and productIds are required' });
   }
 
-  if (!validator.isUUID(createdbyid)) {
-    return res.status(400).json({ error: 'createdbyid must be a valid UUID' });
+  if (!validator.isUUID(createdById)) {
+    return res.status(400).json({ error: 'createdById must be a valid UUID' });
   }
 
-  if (!validator.isLength(cataloguename, { min: 1, max: 255 })) {
-    return res.status(400).json({ error: 'cataloguename must be between 1 and 255 characters' });
+  if (!validator.isLength(catalogueName, { min: 1, max: 255 })) {
+    return res.status(400).json({ error: 'catalogueName must be between 1 and 255 characters' });
   }
-  if (!validator.isLength(companyid, { min: 1, max: 50 })) {
-    return res.status(400).json({ error: 'companyid must be between 1 and 50 characters' });
+  if (!validator.isLength(companyId, { min: 1, max: 50 })) {
+    return res.status(400).json({ error: 'companyId must be between 1 and 50 characters' });
   }
 
-  if (exporturl && !validator.isURL(exporturl, { require_protocol: true })) {
-    return res.status(400).json({ error: 'exporturl must be a valid URL with protocol if provided' });
+  if (exportUrl && !validator.isURL(exportUrl, { require_protocol: true })) {
+    return res.status(400).json({ error: 'exportUrl must be a valid URL with protocol if provided' });
   }
   if (image && !validator.isURL(image, { require_protocol: true })) {
     return res.status(400).json({ error: 'image must be a valid URL with protocol if provided' });
   }
 
-  if (!Array.isArray(productids) || productids.length === 0) {
-    return res.status(400).json({ error: 'productids must be a non-empty array' });
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return res.status(400).json({ error: 'productIds must be a non-empty array' });
   }
-  for (const productid of productids) {
-    if (!validator.isUUID(productid)) {
-      return res.status(400).json({ error: `Invalid productid: ${productid} must be a valid UUID` });
+  for (const productId of productIds) {
+    if (!validator.isUUID(productId)) {
+      return res.status(400).json({ error: `Invalid productId: ${productId} must be a valid UUID` });
     }
   }
 
-  const sanitizedCataloguename = xss(cataloguename.trim());
-  const sanitizedExporturl = exporturl ? xss(exporturl.trim()) : null;
+  const sanitizedCatalogueName = xss(catalogueName.trim());
+  const sanitizedExportUrl = exportUrl ? xss(exportUrl.trim()) : null;
   const sanitizedImage = image ? xss(image.trim()) : null;
-  const sanitizedCompanyid = xss(companyid.trim());
-  const sanitizedProductids = productids.map(id => xss(id.trim()));
+  const sanitizedCompanyId = xss(companyId.trim());
+  const sanitizedProductIds = productIds.map(id => xss(id.trim()));
 
   try {
     const client = await pool.connect();
     try {
-      // Start transaction
       await client.query('BEGIN');
 
-      // Verify createdbyid exists in users table
-      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdbyid]);
+      // Verify createdById exists in users table
+      const userCheck = await client.query('SELECT 1 FROM public.users WHERE id = $1', [createdById]);
       if (userCheck.rowCount === 0) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Invalid createdbyid: user does not exist' });
+        return res.status(400).json({ error: 'Invalid createdById: user does not exist' });
       }
 
-      // Verify productids exist in products table and belong to the same company
-      for (const productid of sanitizedProductids) {
+      // Verify productIds exist in products table and belong to the same company
+      for (const productId of sanitizedProductIds) {
         const productCheck = await client.query(
           'SELECT 1 FROM public.products WHERE id = $1 AND companyid = $2',
-          [productid, sanitizedCompanyid]
+          [productId, sanitizedCompanyId]
         );
         if (productCheck.rowCount === 0) {
           await client.query('ROLLBACK');
-          return res.status(400).json({ error: `Invalid productid: ${productid} does not exist or does not belong to company ${sanitizedCompanyid}` });
+          return res.status(400).json({ error: `Invalid productId: ${productId} does not exist or does not belong to company ${sanitizedCompanyId}` });
         }
       }
 
-      // Check for duplicate cataloguename for the same company
+      // Check for duplicate catalogueName for the same company
       const duplicateCheck = await client.query(
         'SELECT 1 FROM public.productcatalogues WHERE companyid = $1 AND cataloguename = $2 AND id != $3',
-        [sanitizedCompanyid, sanitizedCataloguename, id]
+        [sanitizedCompanyId, sanitizedCatalogueName, id]
       );
       if (duplicateCheck.rowCount > 0) {
         await client.query('ROLLBACK');
@@ -347,7 +408,7 @@ exports.updateProductCatalogue = async (req, res) => {
          SET createdbyid = $1, exporturl = $2, image = $3, cataloguename = $4, companyid = $5, productids = $6
          WHERE id = $7
          RETURNING id, createdbyid, createdon, exporturl, image, cataloguename, companyid, productids`,
-        [createdbyid, sanitizedExporturl, sanitizedImage, sanitizedCataloguename, sanitizedCompanyid, sanitizedProductids, id]
+        [createdById, sanitizedExportUrl, sanitizedImage, sanitizedCatalogueName, sanitizedCompanyId, sanitizedProductIds, id]
       );
 
       if (result.rows.length === 0) {
@@ -359,16 +420,16 @@ exports.updateProductCatalogue = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: toCamelCase(result.rows[0]),
         message: 'Product catalogue updated successfully'
       });
     } catch (err) {
       await client.query('ROLLBACK');
       console.error('Update product catalogue error:', err.stack);
       if (err.code === '23503') {
-        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'createdbyid does not exist in users table' });
+        return res.status(400).json({ error: 'Invalid foreign key value', details: err.detail || 'createdById does not exist in users table' });
       }
-      if (err.code === '23505') {
+      if (err.code=== '23505') {
         return res.status(400).json({ error: 'Duplicate key value', details: err.detail || 'Unique constraint violation' });
       }
       res.status(500).json({ error: 'Failed to update product catalogue', details: err.message });
@@ -389,10 +450,9 @@ exports.deleteProductCatalogue = async (req, res) => {
     return res.status(400).json({ error: 'id must be a valid UUID' });
   }
 
-  try {
+ try {
     const client = await pool.connect();
     try {
-      // Start transaction
       await client.query('BEGIN');
 
       const result = await client.query(
@@ -410,7 +470,7 @@ exports.deleteProductCatalogue = async (req, res) => {
 
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: toCamelCase(result.rows[0]),
         message: 'Product catalogue deleted successfully'
       });
     } catch (err) {

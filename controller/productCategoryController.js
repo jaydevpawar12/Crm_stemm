@@ -2,6 +2,22 @@ const validator = require('validator');
 const xss = require('xss');
 const { pool } = require('../db');
 
+// Utility function to convert snake_case to camelCase
+const toCamelCase = (obj) => {
+  const newObj = {};
+  for (let key in obj) {
+    let camelKey = key.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+    camelKey = camelKey.replace(/^([A-Z])/, (match, letter) => letter.toLowerCase());
+    // Explicit mappings for specific fields
+    if (camelKey === 'categoryname') camelKey = 'categoryName';
+    if (camelKey === 'createdbyid') camelKey = 'createdById';
+    if (camelKey === 'createdon') camelKey = 'createdOn';
+    if (camelKey === 'createdByName') camelKey = 'createdByName';
+    newObj[camelKey] = obj[key];
+  }
+  return newObj;
+};
+
 // Create Product Category
 exports.createCategory = async (req, res) => {
   const { categoryName, createdById } = req.body;
@@ -46,15 +62,18 @@ exports.createCategory = async (req, res) => {
       }
 
       const result = await client.query(
-        'INSERT INTO public.product_categories (categoryname, createdbyid) VALUES ($1, $2) RETURNING id, categoryname, createdbyid, createdon',
+        'INSERT INTO public.product_categories (categoryname, createdbyid, createdon) VALUES ($1, $2, NOW()) RETURNING id, categoryname, createdbyid, createdon',
         [sanitizedCategoryName, createdById]
       );
 
       await client.query('COMMIT');
 
+      // Convert snake_case to camelCase
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(201).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Product category created successfully'
       });
     } catch (err) {
@@ -65,6 +84,9 @@ exports.createCategory = async (req, res) => {
       }
       if (err.code === '23505') {
         return res.status(400).json({ error: 'Duplicate key value', details: 'Unique constraint violation' });
+      }
+      if (err.code === '42703') {
+        return res.status(500).json({ error: 'Database schema error: column not found', details: err.message });
       }
       res.status(500).json({ error: 'Failed to create category', details: err.message });
     } finally {
@@ -135,13 +157,15 @@ exports.getAllCategories = async (req, res) => {
         client.query(countQuery, countParams)
       ]);
 
-      const dataList = result.rows;
+      // Convert snake_case to camelCase
+      const camelCaseRows = result.rows.map(row => toCamelCase(row));
+
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
       res.status(200).json({
         status: true,
         data: {
-          dataList,
+          dataList: camelCaseRows,
           totalCount,
           page: pageNum,
           limit: limitNum,
@@ -151,8 +175,11 @@ exports.getAllCategories = async (req, res) => {
       });
     } catch (err) {
       console.error('Get categories error:', err.stack);
-      if (err.code === '22023' || err.code === '22P02') {
+      if (err.code === '22P02') {
         return res.status(400).json({ error: 'Invalid UUID format in query parameters', details: err.message });
+      }
+      if (err.code === '42703') {
+        return res.status(500).json({ error: 'Database schema error: column not found', details: err.message });
       }
       res.status(500).json({ error: 'Failed to fetch categories', details: err.message });
     } finally {
@@ -192,9 +219,12 @@ exports.getCategoryById = async (req, res) => {
         return res.status(404).json({ error: 'Category not found' });
       }
 
+      // Convert snake_case to camelCase
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Product category fetched successfully'
       });
     } catch (err) {
@@ -202,8 +232,11 @@ exports.getCategoryById = async (req, res) => {
       if (err.code === '22P02') {
         return res.status(400).json({ error: 'Invalid UUID format', details: err.message });
       }
+      if (err.code === '42703') {
+        return res.status(500).json({ error: 'Database schema error: column not found', details: err.message });
+      }
       res.status(500).json({ error: 'Failed to fetch category', details: err.message });
-  } finally {
+    } finally {
       client.release();
     }
   } catch (err) {
@@ -270,9 +303,12 @@ exports.updateCategory = async (req, res) => {
 
       await client.query('COMMIT');
 
+      // Convert snake_case to camelCase
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Product category updated successfully'
       });
     } catch (err) {
@@ -283,6 +319,9 @@ exports.updateCategory = async (req, res) => {
       }
       if (err.code === '23505') {
         return res.status(400).json({ error: 'Duplicate key value', details: 'Unique constraint violation' });
+      }
+      if (err.code === '42703') {
+        return res.status(500).json({ error: 'Database schema error: column not found', details: err.message });
       }
       res.status(500).json({ error: 'Failed to update category', details: err.message });
     } finally {
@@ -319,9 +358,12 @@ exports.deleteCategory = async (req, res) => {
 
       await client.query('COMMIT');
 
+      // Convert snake_case to camelCase
+      const camelCaseData = toCamelCase(result.rows[0]);
+
       res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: camelCaseData,
         message: 'Category deleted successfully'
       });
     } catch (err) {
@@ -329,6 +371,12 @@ exports.deleteCategory = async (req, res) => {
       console.error('Delete category error:', err.stack);
       if (err.code === '23503') {
         return res.status(400).json({ error: 'Cannot delete category due to foreign key constraint', details: 'Category is referenced by other records' });
+      }
+      if (err.code === '22P02') {
+        return res.status(400).json({ error: 'Invalid UUID format', details: err.message });
+      }
+      if (err.code === '42703') {
+        return res.status(500).json({ error: 'Database schema error: column not found', details: err.message });
       }
       res.status(500).json({ error: 'Failed to delete category', details: err.message });
     } finally {

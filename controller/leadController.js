@@ -902,3 +902,51 @@ exports.deleteLead = async (req, res) => {
   }
 };
 
+exports.getLeadStatusCountsByCompanyId = async (req, res) => {
+  const { companyId } = req.params;
+
+  // Validate companyId
+  if (!companyId || !companyId.trim()) {
+    return res.status(400).json({ error: 'Invalid companyId: Must be a non-empty string' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      // Query to count leads grouped by status for the given companyId
+      const result = await client.query(
+        `
+        SELECT 
+          status,
+          COUNT(*) as count
+        FROM leads
+        WHERE companyid = $1
+        GROUP BY status
+        ORDER BY status
+        `,
+        [companyId]
+      );
+
+      // Transform the result into an object with status as keys and counts as values
+      const statusCounts = result.rows.reduce((acc, row) => {
+        acc[row.status] = parseInt(row.count, 10);
+        return acc;
+      }, { Hot: 0, Warm: 0, Cold: 0 }); // Initialize with 0 for each status to handle cases where a status has no leads
+
+      res.status(200).json({
+        status: true,
+        data: statusCounts,
+        message: 'Lead status counts fetched successfully'
+      });
+    } catch (err) {
+      console.error('Get lead status counts error:', err.stack);
+      res.status(500).json({ error: 'Internal server error', details: err.message });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Database connection error:', err.stack);
+    res.status(500).json({ error: 'Failed to connect to database' });
+  }
+};
+
